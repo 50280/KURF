@@ -167,10 +167,10 @@ linear_regression_variables <- port_preprocessed_data[c("reliable_recovery", "re
 #Using indexing to select the correct participants from the broader datasample, such that I can double check the ~1 week estimate between the day where they completed the baseline assessment and the day they started treatment. 
 
 #Loading the initial / archived dataset
-archived_dataset <- readRDS("~/Library/CloudStorage/OneDrive-King'sCollegeLondon/KURF/Data Analysis/Data/flare-undergrad-port-data-2023.rds")
+archived_dataset <- readRDS("flare-undergrad-port-data-2023.rds")
 
 #Loading final PORT KURF dataset
-final_dataset <- readRDS("~/Library/CloudStorage/OneDrive-King'sCollegeLondon/KURF/Data Analysis/Data/02_preprocessed_port_data.rds")
+final_dataset <- readRDS("02_preprocessed_port_data.rds")
 
 final_participants_archived_dataset <- archived_dataset[archived_dataset$participant_id %in% final_dataset$participant_id, ]
 
