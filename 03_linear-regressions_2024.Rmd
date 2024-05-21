@@ -208,8 +208,6 @@ plot(linear_regression_3C, 1)
 ```{r}
 # Checking assumption (2) normality of residuals using another method by computing Q-Q plots and conducting a Shapiro test. These plots can be used to visually check the normality assumption. Here, the normal probability plot of residuals should approximately follow a straight line. 
 
-##DO WE HAVE TO TEST THESE SEPARATELY FOR THE COVARIATES? I DON'T THINK SO, BECAUSE THE COVARIATES ARE INCLUDED IN THESE MODELS. 
-
 plot(linear_regression_1A, 2)
 plot(linear_regression_1B, 2)
 plot(linear_regression_1C, 2)
@@ -244,96 +242,6 @@ shapiro.test(linear_regression_3A$residuals)
 shapiro.test(linear_regression_3B$residuals)
 shapiro.test(linear_regression_3C$residuals)
 
-# However, the p-values obtained by conducting a Shapiro test were significant in the following models 1A, 2A, and 3A. Based on the results from the Shapiro Wilk test, this suggests that the assumption of the normality of residuals is violated in the delta PHQ-9 variable. 
-
-```
-
-```{r}
-
-# Computing test of skewness and kurtosis for the variables where the normality was violated in order to better understand how the distribution is non-normal. 
-
-skewness(port_preprocessed_data$delta_phq9)
-
-#The skewness is -.402, the negative value suggests that it is left skewed, but the magnitude of the skew is not above 1. This suggests that it should not be the skewness of the data responsible for the violation of the assumption of normality in this case. 
-
-kurtosis(port_preprocessed_data$delta_phq9)
-
-#The kurtosis is 4.49 for the distribution of scores on the delta PHQ-9. As this is clearly above a magnitude of 1, it suggests that the distribution is thinner than a normal distribution (leptokurtic). Based on these findings, it appears reasonable to assume that the high kurtosis is what is leading to a violation of the assumption of normality in this case. 
-
-```
-
-
-```{r}
-##Attempting to correct the violation of the assumption using a logarithmic transformation. 
-
-##What Patrycja did in her dissertation, was to log-transform the variable that was violating the assumption, and check whether the results differ significantly from the non-log transformed one. Because they were not significantly different, she then interpreted the non-log transformed one for comparability and ease of interpretation. 
-
-# Based on the above results from the Shapiro-Wilk test, I am now going to run the three linear regressions which include delta PHQ-9, using the log-transformed delta-PHQ-9. If these do not significantly differ from the non-log-transformed results, then I will move forwards with the non-log-transformed results, to facilitate comparability between the results, and ease of interpretation. 
-
-# To this end, computing a new variable that contains the log transformed delta_phq9 
-port_preprocessed_data <- port_preprocessed_data %>% 
-  mutate(log_delta_phq9 = (log(delta_phq9)))
-
-
-port_preprocessed_data <- port_preprocessed_data %>%
-  mutate(log_delta_phq9 = log(delta_phq9),
-         shifted_log_delta_phq9 = log_delta_phq9 - min(log_delta_phq9) + 1)
-
-View(port_preprocessed_data)
-
-#Because the delta_phq9 has quite a few negative values, it results in a lot of NaNs after the logarithmic transformation. This leads to an error message in the regression analyses that follow. 
-
-
-#linear_regression_1A_log <- lm((log_delta_phq9 + 22 +1) ~ retrospectively_reported_improvement + ieso_treatment_completed_n + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
-#linear_regression_2A_log <- lm((log_delta_phq9 +1) ~ retrospectively_treatment_helpful + ieso_treatment_completed_n + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
-
-#linear_regression_3A_log <- lm((log_delta_phq9 +1) ~ retrospectively_reported_improvement + retrospectively_treatment_helpful + ieso_treatment_completed_n + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
-
-#The above linear regressions produce error results, because the log transformed delta PHQ-9 contains to many errors.
-#One way of addressing this issue is to shift the scale of the log transformed delta PHQ-9 such that there are no negative values. 
-
-#Checking what the minimum value of the delta_phq9 variable is, such that I can shift the distribution by this many units. 
-min(port_preprocessed_data$delta_phq9)
-
-#The minimum value is -21, meaning that I will add 22 to the scale, such that the initial value of zero is shifted to 21. 
-#port_preprocessed_data <- port_preprocessed_data %>% 
- # mutate(logplus22_delta_phq9 = (log_delta_phq9 + 22))
-
-#Checking the minimum and the kurtosis of this transformation indicates that the transformation did not have the desired effect on the normality of the distribution. 
-
-
-```
-```{r}
-lin_reg_test = lm(log(delta_phq9 + 22) ~ retrospectively_reported_improvement + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
-summary(lin_reg_test)
-```
-```{r}
-log_phq9_corrected = log(port_preprocessed_data$delta_phq9 + 22)
-print(log_phq9_corrected)
-```
-
-
-```{r}
-#Another way of correcting the violation of this assumption is to conduct a square-root transformation. 
-
-port_preprocessed_data$squareroot_delta_phq9 <- sqrt(port_preprocessed_data$delta_phq9)
-
-#Having the same issue with values in the dataset that are NaNs (= Not a Number). 
-# Have found the suggestion of using the absolute values and then conduct a square root transformation. But then this changes the data significantly, and I am not sure this could be used in the linear regressions. 
-
-# Code for absolute value and square root transformation
-# port_preprocessed_data$absolute_squareroot_delta_phq9 <- sqrt(abs(port_preprocessed_data$delta_phq9))
-
-```
-
-```{r}
-# Alternatively, the data can be changed using a box-cox transformation. This may be justified in this case because it allows to normalise a wide range of distributional shapes, and can handle both negative and positive values. 
-
-# Estimate lambda value 
-#lambda_boxcox_transformation <- boxcox(port_preprocessed_data$delta_phq9 ~ 1, data = port_preprocessed_data)$lambda
-
-# Apply Box-Cox transformation
-#port_preprocessed_data$transformed_phq9_boxcox <- (port_preprocessed_data$delta_phq9^lambda - 1) / lambda
 
 ```
 
@@ -343,8 +251,6 @@ port_preprocessed_data$squareroot_delta_phq9 <- sqrt(port_preprocessed_data$delt
 #Testing whether the regression models are significantly different from one another. This will be done by (1) plotting them on the same graph to visually assess their differences and (2) comparing whether they have comparable levels of significance and effect sizes. 
 
 ```
-
-
 
 ```{r}
 #Checking assumption (3) homogeneity of variance 
@@ -397,8 +303,6 @@ plot(linear_regression_3B,5)
 plot(linear_regression_3C,5)
 
 
-#Need to think about the interpretation of Cook's distance. 
-
 ```
 
 ```{r}
@@ -442,7 +346,7 @@ corr.test(linear_regression_data, adjust = "none")
 
 corPlot(linear_regression_data, diag = F, zlim = c(.0,1), upper = F, numbers = TRUE, cex.axis =.5)
 
-#The correlations between delta GAD-7. PHQ-9 and WSAS are relatively high in their magnitude, however this may be expected given the high co-morbidity between these constructs assessed by these variables. 
+#The correlations between delta GAD-7. PHQ-9 and WSAS are relatively high in their magnitude, however this may be expected given the high co-morbidity between the constructs assessed by these variables. 
 
 ```
 
