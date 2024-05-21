@@ -181,7 +181,6 @@ Cook's Distance is a measure of how influential an instance is to the computatio
 
 In fact, a general rule of thumb is that D(i) > 4/n is a good threshold for determining highly influential points as outliers -> 4/137 =~ 0.03
 
-So we have 3ish outliers - should we ignore them?? 
 
 
 ```{r}
@@ -312,7 +311,6 @@ model.data %>%
 
 ```
 
-**one datapoint is slightly above 2SD from the mean**
 
 
 ## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
@@ -425,8 +423,6 @@ model.data %>%
 
 ```
 
-**one datapoint is slightly above 2SD from the mean**
-
 
 ## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
 
@@ -520,7 +516,7 @@ data_log_reg_ov2_pv1 = port_preprocessed_data %>%
 library("psych")
 corr.test(data_log_reg_ov2_pv1, adjust = "none")
 ```
-**ieso_treatment_completed_total and age - 0.39, gender and retrospectively reported improvement - 0.37**
+
 
 ## ASSUMPTION 4:(4) No extreme outliers
 
@@ -548,7 +544,6 @@ model.data %>%
 
 ```
 
-**2 datapoints are marginally beyond 2SD of the mean**
 
 
 ## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
@@ -577,7 +572,6 @@ ggplot(log_reg_predictors_ov2_pv1, aes(logit, predictor.value))+
   facet_wrap(~predictors, scales = "free_y")
 ```
 
-**there is a linear relationship bewteen the retrospectively_reported_improvement and iapt:reliable improvement**
 
 # PV2: retrospectively_treatment_helpful
 
@@ -629,7 +623,6 @@ data_log_reg_ov2_pv2 = port_preprocessed_data %>%
 ```{r} 
 #corr.test(data_log_reg_ov2_pv2, adjust = "none")
 ```
-**no of treatments and restrospecovely treatment helpful = .36**
 
 ## ASSUMPTION 4:(4) No extreme outliers
 
@@ -637,7 +630,6 @@ data_log_reg_ov2_pv2 = port_preprocessed_data %>%
 #visualizing the Cook's distance values
 plot(log_reg_ov2_pv2, which = 4, id.n = 3)
 ```
-So we have some outliers - should we ignore them?? 
 
 ```{r} 
 # Are these outliers within 2 standard deviations of the mean?
@@ -656,8 +648,6 @@ model.data %>%
   filter(abs(.std.resid) > 3)
 
 ```
-
-**all datapoints are roughly within 1.5SD from the mean**
 
 
 ## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
@@ -740,7 +730,6 @@ data_log_reg_ov2_pv1_pv2 = port_preprocessed_data %>%
 ```{r} 
 #corr.test(data_log_reg_ov2_pv1_pv2, adjust = "none")
 ```
-**correlations between 2 PVs of interest (retrospectively_reported_improvement and retrospectively_treatment_helpful) is .63**
 
 ## ASSUMPTION 4:(4) No extreme outliers
 
@@ -750,7 +739,6 @@ data_log_reg_ov2_pv1_pv2 = port_preprocessed_data %>%
 plot(log_reg_ov2_pv1_pv2, which = 4, id.n = 3)
 ```
 
-So we have some outliers - should we ignore them?? 
 
 
 ```{r} 
@@ -770,8 +758,6 @@ model.data %>%
   filter(abs(.std.resid) > 3)
 
 ```
-
-**3 data points are marginally beyond 2SD from the mean**
 
 
 ## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
@@ -842,7 +828,6 @@ library(car)
 vif(log_reg_ov3_pv1)
 ```
 
-**as all values well below 5 -> no excessive colinearity between predictor variables**
 
 ## Calculating correlation matrix for log_reg_ov3_pv1
 
@@ -857,8 +842,6 @@ data_log_reg_ov3_pv1 = port_preprocessed_data %>%
 library("psych")
 corr.test(data_log_reg_ov3_pv1, adjust = "none")
 ```
-**ieso_treatment_completed_total and retrospectively reported improvement - 0.39**
-
 ## ASSUMPTION 4:(4) No extreme outliers
 
 
@@ -866,8 +849,6 @@ corr.test(data_log_reg_ov3_pv1, adjust = "none")
 #visualizing the Cook's distance values
 plot(log_reg_ov3_pv1, which = 4, id.n = 3)
 ```
-**some outliers - mostly datapoint 77**
-
 
 ```{r}
 # Extract model results
@@ -884,8 +865,6 @@ model.data %>%
   filter(abs(.std.resid) > 3)
 
 ```
-
-**all datapoints within 2SD of the mean**
 
 
 ## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
@@ -913,9 +892,6 @@ ggplot(log_reg_predictors_ov3_pv1, aes(logit, predictor.value))+
   theme_bw() + 
   facet_wrap(~predictors, scales = "free_y")
 ```
-
-
-**there is a linear relationship between the retrospectively_reported_improvement and iapt:reliable recovery**
 
 # PV2: retrospectively_treatment_helpful
 
@@ -953,8 +929,6 @@ library(car)
 vif(log_reg_ov3_pv2)
 ```
 
-**as all values well below 5 -> no excessive colinearity between predictor variables**
-
 ## Calculating correlation matrix for log_reg_ov2_pv2
 
 ```{r}
@@ -967,7 +941,6 @@ data_log_reg_ov3_pv2 = port_preprocessed_data %>%
 ```{r} 
 #corr.test(data_log_reg_ov3_pv2, adjust = "none")
 ```
-**no of treatments and restrospecovely treatment helpful = .36**
 
 ## ASSUMPTION 4:(4) No extreme outliers
 
@@ -976,7 +949,6 @@ data_log_reg_ov3_pv2 = port_preprocessed_data %>%
 #visualizing the Cook's distance values
 plot(log_reg_ov3_pv2, which = 4, id.n = 3)
 ```
-So we have some outliers - should we ignore them?? 
 
 
 ```{r} 
@@ -1090,9 +1062,6 @@ data_log_reg_ov3_pv1_pv2 = port_preprocessed_data %>%
 plot(log_reg_ov3_pv1_pv2, which = 4, id.n = 3)
 ```
 
-So we have some outliers (especially datapont 77) - should we ignore them?? 
-
-
 ```{r} 
 # Are these outliers within 2 standard deviations of the mean?
 
@@ -1110,8 +1079,6 @@ model.data %>%
   filter(abs(.std.resid) > 3)
 
 ```
-
-**all datapoints are within 2SD from the mean**
 
 
 ## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
@@ -1139,8 +1106,6 @@ ggplot(log_reg_predictors_ov3_pv1_pv2, aes(logit, predictor.value))+
   theme_bw() + 
   facet_wrap(~predictors, scales = "free_y")
 ```
-
-**linear relationships between pvs and ov**
 
 
 ## PREDICTING THE PROBABILITIES
@@ -1195,9 +1160,6 @@ visreg(log_reg_ov1_pv1, "retrospectively_reported_improvement",
 
 
 ```
-
-
-
 
 # Visualise log_reg_ov1_pv2
 
@@ -1619,13 +1581,13 @@ print(proportion_table_a)
 library(psych)
 cohen.kappa(x=cbind(port_preprocessed_data$retrospectively_treatment_helpful, port_preprocessed_data$recovered))
 
-##NO AGREEMENT (.064) BETWEEN RECOVERED AND RETROSPECTIVELY TREATMENT HELPFUL
+
 ```
 ```{r}
 contingency_table2 = table(port_preprocessed_data$reliable_improvement, port_preprocessed_data$retrospectively_treatment_helpful)
 print(contingency_table2)
 cohen.kappa(x=cbind(port_preprocessed_data$retrospectively_treatment_helpful, port_preprocessed_data$reliable_improvement))
-##NO AGREEMENT (.058) BETWEEN RELIABLE IMPROVEMENT AND RETROSPECTIVELY TREATMENT HELPFUL
+
 
 # Calculate the proportion of participants in each category
 proportion_table_b <- prop.table(contingency_table2, margin = 1)
@@ -1637,7 +1599,7 @@ print(proportion_table_b)
 contingency_table3 = table(port_preprocessed_data$reliable_recovery, port_preprocessed_data$retrospectively_treatment_helpful)
 print(contingency_table3)
 cohen.kappa(x=cbind(port_preprocessed_data$retrospectively_treatment_helpful, port_preprocessed_data$reliable_recovery))
-##NO AGREEMENT (.056) BETWEEN RELIABLE RECOVERY AND RETROSPECTIVELY TREATMENT HELPFUL
+
 
 # Calculate the proportion of participants in each category
 proportion_table_c <- prop.table(contingency_table3, margin = 1)
