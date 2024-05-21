@@ -1,0 +1,1943 @@
+---
+title: "04_logistic-regressions"
+author: "Caroline & Patrycja"
+date: '2023-07-13'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list=ls())
+```
+
+
+# Initial operations on the dataset
+
+## call libraries
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library (broom)
+```
+
+## load the preprocessed data into R environement
+
+```{r}
+port_preprocessed_data <- readRDS("02_preprocessed_port_data.rds")
+head(port_preprocessed_data)
+```
+
+## inspect variables/ column names
+
+```{r}
+colnames(port_preprocessed_data)
+```
+
+
+
+# Logistic Regressions 
+
+
+Predictor 1: did you find your sessions with ieso helpful (yes; no) 
+
+Predictor 2: how much have your symptoms and day-to-day functioning improved after the sessions with ieso (much better; little better; no change; little worse; much worse) 
+
+
+**PV1**: retrospectively_reported_improvement (much better(4); little better(3); no change(2); little worse(1); much worse(0))
+**PV2**: retrospectively_treatment_helpful (yes(1); no(0))
+**PV1&PV2**: retrospectively_reported_improvement & retrospectively_treatment_helpful
+**Covariates**: No of sessions, gender, age 
+
+**OV1**: recovered (yes; no)
+**OV2**: reliable improvement (yes; no)
+**OV3**: reliable recovery (yes; no)
+
+Guidance websites: (1) \<<https://rcompanion.org/rcompanion/e_07.html>\>
+(2) \<<https://rcompanion.org/rcompanion/e_07.html>\> (3)
+\<<https://www.statology.org/assumptions-of-logistic-regression/>\>
+
+
+## change yes/no in OVs into 1 and 0
+
+
+
+```{r}
+# Modify "yes" and "no" values to numeric values (1 and 0) while keeping NA values as NA
+port_preprocessed_data <- port_preprocessed_data %>%
+  dplyr::mutate(recovered = ifelse(is.na(recovered), NA, ifelse(recovered == "yes", 1, 0)),
+                reliable_improvement = ifelse(is.na(reliable_improvement), NA, ifelse(reliable_improvement == "yes", 1, 0)),
+                reliable_recovery = ifelse(is.na(reliable_recovery), NA, ifelse(reliable_recovery == "yes", 1, 0)))
+
+```
+
+```{r}
+#change demographics_gender into a numeric variable 
+#(non_binary -> 0, male -> 1, female -> 2)
+port_preprocessed_data <- port_preprocessed_data %>%
+  mutate(demographics_gender = ifelse(demographics_gender == "female", 2,
+                                      ifelse(demographics_gender == "male", 1, 0)))
+
+
+```
+
+```{r}
+#Renaming the age variable as a different name was used for it in the preprocessing script 
+
+port_preprocessed_data <- port_preprocessed_data %>%
+  rename(demographics_age_at_screening = demographics_age_at_screening_years)
+```
+
+# **Logistic regressions for OV1: RECOVERED**
+
+## PV1: retrospectively_reported_improvement
+
+
+## Assumptions-checking of Logistic Regression ov1_pv1
+
+(1) Outcome variable is binary - **checked**
+(2) The observations are independent - **checked** (they come from separate individuals)
+(3) No severe multicolinearity among the exploratory variables
+(4) No extreme outliers
+(5) Linear relationship between predictor variables and the logit of
+    outcome variable
+
+##load packages
+
+```{r}
+library(tidyverse)
+library(broom)
+theme_set(theme_classic())
+
+```
+
+```{r}
+unique(port_preprocessed_data$recovered)
+
+```
+
+
+```{r}
+# Fit the logistic regression model ov1_pv1
+log_reg_ov1_pv1 <- glm(recovered ~ retrospectively_reported_improvement + ieso_treatment_completed_total  + demographics_gender + demographics_age_at_screening, 
+                       data = port_preprocessed_data, 
+                       family = binomial)
+
+summary(log_reg_ov1_pv1)
+
+```
+```{r}
+# Predict the probability (p) of symptom improvement
+probabilities_ov1_pv1 <- predict(log_reg_ov1_pv1, type = "response")
+predicted.classes <- ifelse(probabilities_ov1_pv1 > 0.5, "pos", "neg")
+print(predicted.classes)
+
+```
+## ASSUMPTION 3: (3) No severe multicolinearity among the exploratory variables
+ Investigating multicolinearity by looking at the variance inflation factor
+
+The Variance Inflation Factor (VIF) measures the severity of multicollinearity in regression analysis. It is a statistical concept that indicates the increase in the variance of a regression coefficient as a result of collinearity.
+
+The value for VIF starts at 1 and has no upper limit. A general rule of thumb for interpreting VIFs is as follows:
+
+A value of 1 indicates there is no correlation between a given predictor variable and any other predictor variables in the model.
+A value between 1 and 5 indicates moderate correlation between a given predictor variable and other predictor variables in the model, but this is often not severe enough to require attention.
+A value greater than 5 indicates potentially severe correlation between a given predictor variable and other predictor variables in the model. In this case, the coefficient estimates and p-values in the regression output are likely unreliable.
+
+```{r}
+library(car)
+vif(log_reg_ov1_pv1)
+```
+
+**as all values well below 5 -> no excessive colinearity between predictor variables**
+
+## Calculating correlation matrix for log_reg_ov1_pv1
+
+```{r}
+#create a dataset with variables solely used in log_reg_ov1_pv1
+#data_log_reg_ov1_pv1 = port_preprocessed_data %>%
+#  select(recovered, retrospectively_reported_improvement, ieso_treatment_completed_total, demographics_gender, #demographics_age_at_screening)
+```
+
+
+```{r} 
+#library("psych")
+#corr.test(data_log_reg_ov1_pv1, adjust = "none")
+```
+**correlations between the predictor variable and covariates are weak**
+
+## ASSUMPTION 4:(4) No extreme outliers
+
+
+```{r}
+#visualizing the Cook's distance values
+plot(log_reg_ov1_pv1, which = 4, id.n = 3)
+```
+Cook's distance is considered high if it's above 0.5
+Cook's Distance is a measure of how influential an instance is to the computation of a regression, e.g. if the instance is removed would the estimated coeficients of the underlying model be substantially changed? Because of this, Cook's Distance is generally used to detect outliers in standard, OLS regression. 
+
+In fact, a general rule of thumb is that D(i) > 4/n is a good threshold for determining highly influential points as outliers -> 4/137 =~ 0.03
+
+So we have 3ish outliers - should we ignore them?? 
+
+
+```{r}
+# Extract model results
+model.data <- augment(log_reg_ov1_pv1) %>% 
+  mutate(index = 1:n()) 
+#The data for the top 3 largest values, according to the Cook's distance, can be displayed as follow:
+model.data %>% top_n(3, .cooksd)
+#Plot the standardized residuals:
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = retrospectively_reported_improvement), alpha = .5) +
+  theme_bw()
+#Filter potential influential data points:
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+
+```
+
+**all datapoints are well within 2SD of the mean**
+
+
+## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
+
+## Remove qualitative variables from the original data frame and bind the logit values to the data:
+
+```{r}
+
+# Select only numeric predictors
+log_reg_predictors_ov1_pv1 <- port_preprocessed_data %>%
+  select(ieso_treatment_completed_total, demographics_age_at_screening, demographics_gender, retrospectively_reported_improvement)
+# Bind the logit and tidying the data for plot
+log_reg_predictors_ov1_pv1 <- log_reg_predictors_ov1_pv1 %>%
+  mutate(logit = log(probabilities_ov1_pv1/(1-probabilities_ov1_pv1))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+```
+
+## Create scatterplots
+
+```{r}
+ggplot(log_reg_predictors_ov1_pv1, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+**there is a linear relationship bewteen the retrospectively_reported_improvement and iapt:recovered**
+
+# PV2: retrospectively_treatment_helpful
+
+## Assumptions-checking of Logistic Regression ov1_pv2
+
+(1) Outcome variable is binary - **checked**
+(2) The observations are independent - **checked** (they come from separate individuals)
+(3) No severe multicolinearity among the exploratory variables
+(4) No extreme outliers
+(5) Linear relationship between predictor variables and the logit of
+    outcome variable
+
+
+```{r}
+# Fit the logistic regression model ov1_pv2
+log_reg_ov1_pv2 <- glm(recovered ~ retrospectively_treatment_helpful + ieso_treatment_completed_total  + demographics_gender + demographics_age_at_screening, 
+                       data = port_preprocessed_data, 
+                       family = binomial)
+
+summary(log_reg_ov1_pv2)
+
+```
+```{r}
+# Predict the probability (p) of symptom improvement
+probabilities_ov1_pv2 <- predict(log_reg_ov1_pv2, type = "response")
+predicted.classes <- ifelse(probabilities_ov1_pv2 > 0.5, "pos", "neg")
+print(predicted.classes)
+
+```
+## ASSUMPTION 3: (3) No severe multicolinearity among the exploratory variables
+ 
+
+```{r}
+library(car)
+vif(log_reg_ov1_pv2)
+```
+
+**as all values well below 5 -> no excessive colinearity between predictor variables**
+
+## Calculating correlation matrix for log_reg_ov1_pv2
+
+```{r}
+#create a dataset with variables solely used in log_reg_ov1_pv2
+data_log_reg_ov1_pv2 = port_preprocessed_data %>%
+  select(recovered, retrospectively_treatment_helpful, ieso_treatment_completed_total, demographics_gender, demographics_age_at_screening)
+```
+
+
+```{r} 
+#corr.test(data_log_reg_ov1_pv2, adjust = "none")
+```
+**correlations between the predictor variable and covariates are weak**
+
+## ASSUMPTION 4:(4) No extreme outliers
+
+
+```{r}
+#visualizing the Cook's distance values
+plot(log_reg_ov1_pv2, which = 4, id.n = 3)
+```
+
+So we have 3 or 4ish outliers - should we ignore them?? 
+
+
+```{r} 
+# Are these outliers within 2 standard deviations of the mean?
+
+# Extract model results
+model.data <- augment(log_reg_ov1_pv2) %>% 
+  mutate(index = 1:n()) 
+#The data for the top 3 largest values, according to the Cook's distance, can be displayed as follow:
+model.data %>% top_n(3, .cooksd)
+#Plot the standardized residuals:
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = retrospectively_treatment_helpful), alpha = .5) +
+  theme_bw()
+#Filter potential influential data points:
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+
+```
+
+**one datapoint is slightly above 2SD from the mean**
+
+
+## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
+
+## Remove qualitative variables from the original data frame and bind the logit values to the data:
+
+```{r}
+
+# Select only numeric predictors
+log_reg_predictors_ov1_pv2 <- port_preprocessed_data %>%
+  select(ieso_treatment_completed_total, demographics_age_at_screening, demographics_gender, retrospectively_treatment_helpful)
+# Bind the logit and tidying the data for plot
+log_reg_predictors_ov1_pv2 <- log_reg_predictors_ov1_pv2 %>%
+  mutate(logit = log(probabilities_ov1_pv2/(1-probabilities_ov1_pv2))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+```
+
+## Create scatterplots
+
+```{r}
+ggplot(log_reg_predictors_ov1_pv2, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+**linear relationships between pvs and ov**
+
+# PV1 & PV2: retrospectively_reported_improvement and retrospectively_treatment_helpful
+
+## Assumptions-checking of Logistic Regression ov1_pv1_pv2
+
+(1) Outcome variable is binary - **checked**
+(2) The observations are independent - **checked** (they come from separate individuals)
+(3) No severe multicolinearity among the exploratory variables
+(4) No extreme outliers
+(5) Linear relationship between predictor variables and the logit of
+    outcome variable
+
+
+```{r}
+# Fit the logistic regression model ov1_pv1_pv2
+log_reg_ov1_pv1_pv2 <- glm(recovered ~ retrospectively_reported_improvement  + retrospectively_treatment_helpful +  ieso_treatment_completed_total  + demographics_gender + demographics_age_at_screening, 
+                       data = port_preprocessed_data, 
+                       family = binomial)
+
+summary(log_reg_ov1_pv1_pv2)
+
+```
+
+```{r}
+# Predict the probability (p) of symptom improvement
+probabilities_ov1_pv1_pv2 <- predict(log_reg_ov1_pv1_pv2, type = "response")
+predicted.classes <- ifelse(probabilities_ov1_pv1_pv2 > 0.5, "pos", "neg")
+print(predicted.classes)
+
+```
+## ASSUMPTION 3: (3) No severe multicolinearity among the exploratory variables
+ Investigating multicolinearity by looking at the variance inflation factor
+
+
+```{r}
+library(car)
+vif(log_reg_ov1_pv1_pv2)
+```
+
+**as all values well below 5 -> no excessive colinearity between predictor variables**
+
+## Calculating correlation matrix for log_reg_ov1_pv1_pv2
+
+```{r}
+#create a dataset with variables solely used in log_reg_ov1_pv1_pv2
+data_log_reg_ov1_pv1_pv2 = port_preprocessed_data %>%
+  select(recovered,retrospectively_reported_improvement, retrospectively_treatment_helpful, ieso_treatment_completed_total, demographics_gender, demographics_age_at_screening)
+```
+
+
+```{r} 
+#corr.test(data_log_reg_ov1_pv1_pv2, adjust = "none")
+```
+**correlations between 2 PVs of interest (retrospectively_reported_improvement and retrospectively_treatment_helpful) is .63**
+
+## ASSUMPTION 4:(4) No extreme outliers
+
+
+```{r}
+#visualizing the Cook's distance values
+plot(log_reg_ov1_pv1_pv2, which = 4, id.n = 3)
+```
+So we have some outliers - should we ignore them?? 
+
+
+```{r} 
+# Are these outliers within 2 standard deviations of the mean?
+
+# Extract model results
+model.data <- augment(log_reg_ov1_pv1_pv2) %>% 
+  mutate(index = 1:n()) 
+#The data for the top 3 largest values, according to the Cook's distance, can be displayed as follow:
+model.data %>% top_n(3, .cooksd)
+#Plot the standardized residuals:
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = retrospectively_reported_improvement), alpha = .5) +
+  theme_bw()
+#Filter potential influential data points:
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+
+```
+
+**one datapoint is slightly above 2SD from the mean**
+
+
+## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
+
+## Remove qualitative variables from the original data frame and bind the logit values to the data:
+
+```{r}
+# Select only numeric predictors
+log_reg_predictors_ov1_pv1_pv2 <- port_preprocessed_data %>%
+  select(ieso_treatment_completed_total, demographics_age_at_screening, demographics_gender, retrospectively_treatment_helpful, retrospectively_reported_improvement)
+# Bind the logit and tidying the data for plot
+log_reg_predictors_ov1_pv1_pv2 <- log_reg_predictors_ov1_pv1_pv2 %>%
+  mutate(logit = log(probabilities_ov1_pv1_pv2/(1-probabilities_ov1_pv1_pv2))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+```
+
+## Create scatterplots
+
+```{r}
+ggplot(log_reg_predictors_ov1_pv1_pv2, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+**linear relationships between pvs and ov**
+
+# **Logistic regressions for OV2: RELIABLE_IMPROVEMENT**
+
+## PV1: retrospectively_reported_improvement
+
+## Assumptions-checking of Logistic Regression ov2_pv1
+
+(1) Outcome variable is binary - checked
+(2) The observations are independent - checked (they come from separate individuals)
+(3) No severe multicolinearity among the exploratory variables
+(4) No extreme outliers
+(5) Linear relationship between predictor variables and the logit of
+    outcome variable
+
+##load packages
+
+```{r}
+library(tidyverse)
+library(broom)
+theme_set(theme_classic())
+
+```
+
+
+```{r}
+# Fit the logistic regression model ov2_pv1
+log_reg_ov2_pv1 <- glm(reliable_improvement ~ retrospectively_reported_improvement + ieso_treatment_completed_total  + demographics_gender + demographics_age_at_screening, 
+                       data = port_preprocessed_data, 
+                       family = binomial)
+
+summary(log_reg_ov2_pv1)
+
+```
+
+
+```{r}
+# Predict the probability (p) of symptom improvement
+probabilities_ov2_pv1 <- predict(log_reg_ov2_pv1, type = "response")
+predicted.classes <- ifelse(probabilities_ov2_pv1 > 0.5, "pos", "neg")
+print(predicted.classes)
+
+```
+
+## ASSUMPTION 3: (3) No severe multicolinearity among the exploratory variables
+ 
+
+```{r}
+library(car)
+vif(log_reg_ov2_pv1)
+```
+
+**as all values well below 5 -> no excessive colinearity between predictor variables**
+
+## Calculating correlation matrix for log_reg_ov2_pv1
+
+```{r}
+#create a dataset with variables solely used in log_reg_ov1_pv1
+data_log_reg_ov2_pv1 = port_preprocessed_data %>%
+  select(reliable_improvement, retrospectively_reported_improvement, ieso_treatment_completed_total, demographics_gender, demographics_age_at_screening)
+```
+
+
+```{r} 
+library("psych")
+corr.test(data_log_reg_ov2_pv1, adjust = "none")
+```
+**ieso_treatment_completed_total and age - 0.39, gender and retrospectively reported improvement - 0.37**
+
+## ASSUMPTION 4:(4) No extreme outliers
+
+
+```{r}
+#visualizing the Cook's distance values
+plot(log_reg_ov2_pv1, which = 4, id.n = 3)
+```
+**some outliers**
+
+
+```{r}
+# Extract model results
+model.data <- augment(log_reg_ov2_pv1) %>% 
+  mutate(index = 1:n()) 
+#The data for the top 3 largest values, according to the Cook's distance, can be displayed as follow:
+model.data %>% top_n(3, .cooksd)
+#Plot the standardized residuals:
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = retrospectively_reported_improvement), alpha = .5) +
+  theme_bw()
+#Filter potential influential data points:
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+
+```
+
+**2 datapoints are marginally beyond 2SD of the mean**
+
+
+## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
+
+## Remove qualitative variables from the original data frame and bind the logit values to the data:
+
+```{r}
+
+# Select only numeric predictors
+log_reg_predictors_ov2_pv1 <- port_preprocessed_data %>%
+  select(ieso_treatment_completed_total, demographics_age_at_screening, demographics_gender, retrospectively_reported_improvement)
+# Bind the logit and tidying the data for plot
+log_reg_predictors_ov2_pv1 <- log_reg_predictors_ov2_pv1 %>%
+  mutate(logit = log(probabilities_ov2_pv1/(1-probabilities_ov2_pv1))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+```
+
+## Create scatterplots
+
+```{r}
+ggplot(log_reg_predictors_ov2_pv1, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+**there is a linear relationship bewteen the retrospectively_reported_improvement and iapt:reliable improvement**
+
+# PV2: retrospectively_treatment_helpful
+
+## Assumptions-checking of Logistic Regression ov2_pv2
+
+(1) Outcome variable is binary - **checked**
+(2) The observations are independent - **checked** (they come from separate individuals)
+(3) No severe multicolinearity among the exploratory variables
+(4) No extreme outliers
+(5) Linear relationship between predictor variables and the logit of
+    outcome variable
+
+
+```{r}
+# Fit the logistic regression model ov2_pv2
+log_reg_ov2_pv2 <- glm(reliable_improvement ~ retrospectively_treatment_helpful + ieso_treatment_completed_total  + demographics_gender + demographics_age_at_screening, 
+                       data = port_preprocessed_data, 
+                       family = binomial)
+
+summary(log_reg_ov2_pv2)
+
+```
+```{r}
+# Predict the probability (p) of symptom improvement
+probabilities_ov2_pv2 <- predict(log_reg_ov2_pv2, type = "response")
+predicted.classes <- ifelse(probabilities_ov2_pv2 > 0.5, "pos", "neg")
+print(predicted.classes)
+
+```
+## ASSUMPTION 3: (3) No severe multicolinearity among the exploratory variables
+
+
+```{r}
+library(car)
+vif(log_reg_ov2_pv2)
+```
+
+**as all values well below 5 -> no excessive colinearity between predictor variables**
+
+## Calculating correlation matrix for log_reg_ov2_pv2
+
+```{r}
+#create a dataset with variables solely used in log_reg_ov1_pv2
+data_log_reg_ov2_pv2 = port_preprocessed_data %>%
+  select(reliable_improvement, retrospectively_treatment_helpful, ieso_treatment_completed_total, demographics_gender, demographics_age_at_screening)
+```
+
+
+```{r} 
+#corr.test(data_log_reg_ov2_pv2, adjust = "none")
+```
+**no of treatments and restrospecovely treatment helpful = .36**
+
+## ASSUMPTION 4:(4) No extreme outliers
+
+```{r}
+#visualizing the Cook's distance values
+plot(log_reg_ov2_pv2, which = 4, id.n = 3)
+```
+So we have some outliers - should we ignore them?? 
+
+```{r} 
+# Are these outliers within 2 standard deviations of the mean?
+
+# Extract model results
+model.data <- augment(log_reg_ov2_pv2) %>% 
+  mutate(index = 1:n()) 
+#The data for the top 3 largest values, according to the Cook's distance, can be displayed as follow:
+model.data %>% top_n(3, .cooksd)
+#Plot the standardized residuals:
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = retrospectively_treatment_helpful), alpha = .5) +
+  theme_bw()
+#Filter potential influential data points:
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+
+```
+
+**all datapoints are roughly within 1.5SD from the mean**
+
+
+## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
+
+## Remove qualitative variables from the original data frame and bind the logit values to the data:
+
+```{r}
+
+# Select only numeric predictors
+log_reg_predictors_ov2_pv2 <- port_preprocessed_data %>%
+  select(ieso_treatment_completed_total, demographics_age_at_screening, demographics_gender, retrospectively_treatment_helpful)
+# Bind the logit and tidying the data for plot
+log_reg_predictors_ov2_pv2 <- log_reg_predictors_ov2_pv2 %>%
+  mutate(logit = log(probabilities_ov2_pv2/(1-probabilities_ov2_pv2))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+```
+
+## Create scatterplots
+
+```{r}
+ggplot(log_reg_predictors_ov2_pv2, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+**linear relationships between pvs and ov**
+
+# PV1 & PV2: retrospectively_reported_improvement and retrospectively_treatment_helpful
+
+## Assumptions-checking of Logistic Regression ov2_pv1_pv2
+
+(1) Outcome variable is binary - **checked**
+(2) The observations are independent - **checked** (they come from separate individuals)
+(3) No severe multicolinearity among the exploratory variables
+(4) No extreme outliers
+(5) Linear relationship between predictor variables and the logit of
+    outcome variable
+
+
+```{r}
+# Fit the logistic regression model ov1_pv1_pv2
+log_reg_ov2_pv1_pv2 <- glm(reliable_improvement ~ retrospectively_reported_improvement  + retrospectively_treatment_helpful +  ieso_treatment_completed_total  + demographics_gender + demographics_age_at_screening, 
+                       data = port_preprocessed_data, 
+                       family = binomial)
+
+summary(log_reg_ov2_pv1_pv2)
+
+```
+
+```{r}
+# Predict the probability (p) of symptom improvement
+probabilities_ov2_pv1_pv2 <- predict(log_reg_ov2_pv1_pv2, type = "response")
+predicted.classes <- ifelse(probabilities_ov1_pv1_pv2 > 0.5, "pos", "neg")
+print(predicted.classes)
+
+```
+## ASSUMPTION 3: (3) No severe multicolinearity among the exploratory variables
+ Investigating multicolinearity by looking at the variance inflation factor
+
+
+```{r}
+library(car)
+vif(log_reg_ov2_pv1_pv2)
+```
+
+**as all values well below 5 -> no excessive colinearity between predictor variables**
+
+## Calculating correlation matrix for log_reg_ov2_pv1_pv2
+
+```{r}
+#create a dataset with variables solely used in log_reg_ov1_pv2
+data_log_reg_ov2_pv1_pv2 = port_preprocessed_data %>%
+  select(reliable_improvement,retrospectively_reported_improvement, retrospectively_treatment_helpful, ieso_treatment_completed_total, demographics_gender, demographics_age_at_screening)
+```
+
+
+```{r} 
+#corr.test(data_log_reg_ov2_pv1_pv2, adjust = "none")
+```
+**correlations between 2 PVs of interest (retrospectively_reported_improvement and retrospectively_treatment_helpful) is .63**
+
+## ASSUMPTION 4:(4) No extreme outliers
+
+
+```{r}
+#visualizing the Cook's distance values
+plot(log_reg_ov2_pv1_pv2, which = 4, id.n = 3)
+```
+
+So we have some outliers - should we ignore them?? 
+
+
+```{r} 
+# Are these outliers within 2 standard deviations of the mean?
+
+# Extract model results
+model.data <- augment(log_reg_ov2_pv1_pv2) %>% 
+  mutate(index = 1:n()) 
+#The data for the top 3 largest values, according to the Cook's distance, can be displayed as follow:
+model.data %>% top_n(3, .cooksd)
+#Plot the standardized residuals:
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = retrospectively_reported_improvement), alpha = .5) +
+  theme_bw()
+#Filter potential influential data points:
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+
+```
+
+**3 data points are marginally beyond 2SD from the mean**
+
+
+## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
+
+## Remove qualitative variables from the original data frame and bind the logit values to the data:
+
+```{r}
+
+# Select only numeric predictors
+log_reg_predictors_ov2_pv1_pv2 <- port_preprocessed_data %>%
+  select(ieso_treatment_completed_total, demographics_age_at_screening, demographics_gender, retrospectively_treatment_helpful, retrospectively_reported_improvement)
+# Bind the logit and tidying the data for plot
+log_reg_predictors_ov2_pv1_pv2 <- log_reg_predictors_ov2_pv1_pv2 %>%
+  mutate(logit = log(probabilities_ov2_pv1_pv2/(1-probabilities_ov2_pv1_pv2))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+```
+
+## Create scatterplots
+
+```{r}
+ggplot(log_reg_predictors_ov2_pv1_pv2, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+**linear relationships between pvs and ov**
+
+# **Logistic regressions for OV3: RELIABLE_RECOVERY**
+
+## PV1: retrospectively_reported_improvement
+
+## Assumptions-checking of Logistic Regression ov3_pv1
+
+(1) Outcome variable is binary - **checked**
+(2) The observations are independent - **checked** (they come from separate individuals)
+(3) No severe multicolinearity among the exploratory variables
+(4) No extreme outliers
+(5) Linear relationship between predictor variables and the logit of
+    outcome variable
+
+```{r}
+# Fit the logistic regression model ov3_pv1
+log_reg_ov3_pv1 <- glm(reliable_recovery ~ retrospectively_reported_improvement + ieso_treatment_completed_total  + demographics_gender + demographics_age_at_screening, 
+                       data = port_preprocessed_data, 
+                       family = binomial)
+
+summary(log_reg_ov3_pv1)
+
+```
+
+
+```{r}
+# Predict the probability (p) of symptom improvement
+probabilities_ov3_pv1 <- predict(log_reg_ov3_pv1, type = "response")
+predicted.classes <- ifelse(probabilities_ov3_pv1 > 0.5, "pos", "neg")
+print(predicted.classes)
+
+```
+
+## ASSUMPTION 3: (3) No severe multicolinearity among the exploratory variables
+ 
+
+```{r}
+library(car)
+vif(log_reg_ov3_pv1)
+```
+
+**as all values well below 5 -> no excessive colinearity between predictor variables**
+
+## Calculating correlation matrix for log_reg_ov3_pv1
+
+```{r}
+#create a dataset with variables solely used in log_reg_ov1_pv1
+data_log_reg_ov3_pv1 = port_preprocessed_data %>%
+  select(reliable_recovery, retrospectively_reported_improvement, ieso_treatment_completed_total, demographics_gender, demographics_age_at_screening)
+```
+
+
+```{r} 
+library("psych")
+corr.test(data_log_reg_ov3_pv1, adjust = "none")
+```
+**ieso_treatment_completed_total and retrospectively reported improvement - 0.39**
+
+## ASSUMPTION 4:(4) No extreme outliers
+
+
+```{r}
+#visualizing the Cook's distance values
+plot(log_reg_ov3_pv1, which = 4, id.n = 3)
+```
+**some outliers - mostly datapoint 77**
+
+
+```{r}
+# Extract model results
+model.data <- augment(log_reg_ov3_pv1) %>% 
+  mutate(index = 1:n()) 
+#The data for the top 3 largest values, according to the Cook's distance, can be displayed as follow:
+model.data %>% top_n(3, .cooksd)
+#Plot the standardized residuals:
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = retrospectively_reported_improvement), alpha = .5) +
+  theme_bw()
+#Filter potential influential data points:
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+
+```
+
+**all datapoints within 2SD of the mean**
+
+
+## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
+
+## Remove qualitative variables from the original data frame and bind the logit values to the data:
+
+```{r}
+
+# Select only numeric predictors
+log_reg_predictors_ov3_pv1 <- port_preprocessed_data %>%
+  select(ieso_treatment_completed_total, demographics_age_at_screening, demographics_gender, retrospectively_reported_improvement)
+# Bind the logit and tidying the data for plot
+log_reg_predictors_ov3_pv1 <- log_reg_predictors_ov3_pv1 %>%
+  mutate(logit = log(probabilities_ov3_pv1/(1-probabilities_ov3_pv1))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+```
+
+## Create scatterplots
+
+```{r}
+ggplot(log_reg_predictors_ov3_pv1, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+
+**there is a linear relationship between the retrospectively_reported_improvement and iapt:reliable recovery**
+
+# PV2: retrospectively_treatment_helpful
+
+## Assumptions-checking of Logistic Regression ov3_pv2
+
+(1) Outcome variable is binary - **checked**
+(2) The observations are independent - **checked** (they come from separate individuals)
+(3) No severe multicolinearity among the exploratory variables
+(4) No extreme outliers
+(5) Linear relationship between predictor variables and the logit of
+    outcome variable
+
+
+```{r}
+# Fit the logistic regression model ov3_pv2
+log_reg_ov3_pv2 <- glm(reliable_recovery ~ retrospectively_treatment_helpful + ieso_treatment_completed_total  + demographics_gender + demographics_age_at_screening, 
+                       data = port_preprocessed_data, 
+                       family = binomial)
+
+summary(log_reg_ov3_pv2)
+
+```
+```{r}
+# Predict the probability (p) of symptom improvement
+probabilities_ov3_pv2 <- predict(log_reg_ov3_pv2, type = "response")
+predicted.classes <- ifelse(probabilities_ov3_pv2 > 0.5, "pos", "neg")
+print(predicted.classes)
+
+```
+## ASSUMPTION 3: (3) No severe multicolinearity among the exploratory variables
+
+
+```{r}
+library(car)
+vif(log_reg_ov3_pv2)
+```
+
+**as all values well below 5 -> no excessive colinearity between predictor variables**
+
+## Calculating correlation matrix for log_reg_ov2_pv2
+
+```{r}
+#create a dataset with variables solely used in log_reg_ov3_pv2
+data_log_reg_ov3_pv2 = port_preprocessed_data %>%
+  select(reliable_recovery, retrospectively_treatment_helpful, ieso_treatment_completed_total, demographics_gender, demographics_age_at_screening)
+```
+
+
+```{r} 
+#corr.test(data_log_reg_ov3_pv2, adjust = "none")
+```
+**no of treatments and restrospecovely treatment helpful = .36**
+
+## ASSUMPTION 4:(4) No extreme outliers
+
+
+```{r}
+#visualizing the Cook's distance values
+plot(log_reg_ov3_pv2, which = 4, id.n = 3)
+```
+So we have some outliers - should we ignore them?? 
+
+
+```{r} 
+# Are these outliers within 2 standard deviations of the mean?
+
+# Extract model results
+model.data <- augment(log_reg_ov3_pv2) %>% 
+  mutate(index = 1:n()) 
+#The data for the top 3 largest values, according to the Cook's distance, can be displayed as follow:
+model.data %>% top_n(3, .cooksd)
+#Plot the standardized residuals:
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = retrospectively_treatment_helpful), alpha = .5) +
+  theme_bw()
+#Filter potential influential data points:
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+
+```
+
+**all datapoints are within 2SD from the mean**
+
+
+## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
+
+## Remove qualitative variables from the original data frame and bind the logit values to the data:
+
+```{r}
+
+# Select only numeric predictors
+log_reg_predictors_ov3_pv2 <- port_preprocessed_data %>%
+  select(ieso_treatment_completed_total, demographics_age_at_screening, demographics_gender, retrospectively_treatment_helpful)
+# Bind the logit and tidying the data for plot
+log_reg_predictors_ov3_pv2 <- log_reg_predictors_ov3_pv2 %>%
+  mutate(logit = log(probabilities_ov3_pv2/(1-probabilities_ov3_pv2))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+```
+
+## Create scatterplots
+
+```{r}
+ggplot(log_reg_predictors_ov3_pv2, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+**linear relationships between pvs and ov**
+
+# PV1 & PV2: retrospectively_reported_improvement and retrospectively_treatment_helpful
+
+## Assumptions-checking of Logistic Regression ov3_pv1_pv2
+
+(1) Outcome variable is binary - **checked**
+(2) The observations are independent - **checked** (they come from separate individuals)
+(3) No severe multicolinearity among the exploratory variables
+(4) No extreme outliers
+(5) Linear relationship between predictor variables and the logit of
+    outcome variable
+
+
+```{r}
+# Fit the logistic regression model ov3_pv1_pv2
+log_reg_ov3_pv1_pv2 <- glm(reliable_recovery ~ retrospectively_reported_improvement  + retrospectively_treatment_helpful +  ieso_treatment_completed_total  + demographics_gender + demographics_age_at_screening, 
+                       data = port_preprocessed_data, 
+                       family = binomial)
+
+summary(log_reg_ov3_pv1_pv2)
+
+```
+
+```{r}
+# Predict the probability (p) of symptom improvement
+probabilities_ov3_pv1_pv2 <- predict(log_reg_ov3_pv1_pv2, type = "response")
+predicted.classes <- ifelse(probabilities_ov3_pv1_pv2 > 0.5, "pos", "neg")
+print(predicted.classes)
+
+```
+## ASSUMPTION 3: (3) No severe multicolinearity among the exploratory variables
+ Investigating multicolinearity by looking at the variance inflation factor
+
+
+```{r}
+library(car)
+vif(log_reg_ov3_pv1_pv2)
+```
+
+**as all values well below 5 -> no excessive colinearity between predictor variables**
+
+## Calculating correlation matrix for log_reg_ov3_pv1_pv2
+
+```{r}
+#create a dataset with variables solely used in log_reg_ov1_pv2
+data_log_reg_ov3_pv1_pv2 = port_preprocessed_data %>%
+  select(reliable_recovery,retrospectively_reported_improvement, retrospectively_treatment_helpful, ieso_treatment_completed_total, demographics_gender, demographics_age_at_screening)
+```
+
+
+```{r} 
+#corr.test(data_log_reg_ov3_pv1_pv2, adjust = "none")
+```
+**correlations between 2 PVs of interest (retrospectively_reported_improvement and retrospectively_treatment_helpful) is .63; additionaly between no of sessions attended and retrospectively related improvement and retrospectively treatment helpful - 0.37 and 0.36, retrospectively**
+
+## ASSUMPTION 4:(4) No extreme outliers
+
+
+```{r}
+#visualizing the Cook's distance values
+plot(log_reg_ov3_pv1_pv2, which = 4, id.n = 3)
+```
+
+So we have some outliers (especially datapont 77) - should we ignore them?? 
+
+
+```{r} 
+# Are these outliers within 2 standard deviations of the mean?
+
+# Extract model results
+model.data <- augment(log_reg_ov3_pv1_pv2) %>% 
+  mutate(index = 1:n()) 
+#The data for the top 3 largest values, according to the Cook's distance, can be displayed as follow:
+model.data %>% top_n(3, .cooksd)
+#Plot the standardized residuals:
+ggplot(model.data, aes(index, .std.resid)) + 
+  geom_point(aes(color = retrospectively_reported_improvement), alpha = .5) +
+  theme_bw()
+#Filter potential influential data points:
+model.data %>% 
+  filter(abs(.std.resid) > 3)
+
+```
+
+**all datapoints are within 2SD from the mean**
+
+
+## ASSUMPTION 5: (5) Linear relationship between predictor variables and the logit of outcome variable
+
+## Remove qualitative variables from the original data frame and bind the logit values to the data:
+
+```{r}
+
+# Select only numeric predictors
+log_reg_predictors_ov3_pv1_pv2 <- port_preprocessed_data %>%
+  select(ieso_treatment_completed_total, demographics_age_at_screening, demographics_gender, retrospectively_treatment_helpful, retrospectively_reported_improvement)
+# Bind the logit and tidying the data for plot
+log_reg_predictors_ov3_pv1_pv2 <- log_reg_predictors_ov3_pv1_pv2 %>%
+  mutate(logit = log(probabilities_ov3_pv1_pv2/(1-probabilities_ov3_pv1_pv2))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+```
+
+## Create scatterplots
+
+```{r}
+ggplot(log_reg_predictors_ov3_pv1_pv2, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+**linear relationships between pvs and ov**
+
+
+## PREDICTING THE PROBABILITIES
+
+
+# Visualise log_reg_ov1_pv1
+```{r}
+library(ggplot2)
+library(visreg)
+library(extrafont)
+
+# Import system fonts - only supports TrueType fonts
+# font_import() # This can take a while
+
+# Set the font to Calibri
+theme_set(theme_bw(base_family = "Calibri"))
+
+# Modify font size
+theme_update(plot.title = element_text(size = 12, face = "bold"),
+             axis.title.x = element_text(size = 12),
+             axis.title.y = element_text(size = 12),
+             axis.text.x = element_text(size = 12),
+             axis.text.y = element_text(size = 12),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 12))
+
+# Define plot
+visreg(log_reg_ov1_pv1, "retrospectively_reported_improvement", 
+       gg = TRUE, 
+       scale = "response",
+       jitter = TRUE) +
+  
+  # Modify y-axis label to present in two lines
+  labs(y = "Probability of Recovery(Yes)", 
+       x = "Improvement",
+       title = "Relationship Between Improvement Categories\nand NHSTT Treatment Outcome - Recovery",
+       subtitle = "Controlling For: Number of Treatment Sessions, Gender, and Age") +
+  
+  # Replace numeric values on the x-axis with corresponding labels
+  scale_x_continuous(labels = c("Much Worse", "Little Worse", "No Change", "Little Better", "Much Better")) +
+  
+  # Modify theme to APA7 style
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(linewidth = 1),
+        axis.ticks = element_line(linewidth = 0.5),
+        legend.position = "bottom",
+        legend.justification = "center",
+        legend.box = "horizontal")
+
+
+```
+
+
+
+
+# Visualise log_reg_ov1_pv2
+
+```{r}
+
+library(ggplot2)
+library(visreg)
+library(extrafont)
+
+# Import system fonts - only supports TrueType fonts
+# font_import() # This can take a while
+
+# Set the font to Calibri
+theme_set(theme_bw(base_family = "Calibri"))
+
+# Modify font size
+theme_update(plot.title = element_text(size = 12, face = "bold"),
+             axis.title.x = element_text(size = 12),
+             axis.title.y = element_text(size = 12),
+             axis.text.x = element_text(size = 12),
+             axis.text.y = element_text(size = 12),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 12))
+# Convert 'retrospectively_treatment_helpful' column to a factor with labels "No" and "Yes"
+#log_reg_ov1_pv2$retrospectively_treatment_helpful <- #factor(log_reg_ov1_pv2$retrospectively_treatment_helpful, levels = c(0, 1), labels = c("No", "Yes"))
+
+# Define plot
+visreg(log_reg_ov1_pv2, "retrospectively_treatment_helpful", 
+       gg = TRUE, 
+       scale = "response",
+       jitter = TRUE) +
+  
+  # Modify y-axis label to present in two lines
+  labs(y = "Probability of Recovery(Yes)", 
+       x = "Helpfulness",
+       title = "Relationship Between Helpfulness Categories\nand NHSTT Treatment Outcome - Recovery",
+       subtitle = "Controlling For: Number of Treatment Sessions, Gender, and Age") +
+     
+  # Replace 0 and 1 on the x-axis with "No" and "Yes"
+ #scale_x_continuous(labels = c("No", "Yes")) +
+  # Modify theme to APA7 style
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(linewidth = 1),
+        axis.ticks = element_line(linewidth = 0.5),
+        legend.position = "bottom",
+        legend.justification = "center",
+        legend.box = "horizontal")
+
+```
+# Visualise log_reg_ov1_pv1_pv2
+
+```{r}
+
+library(ggplot2)
+library(visreg)
+library(extrafont)
+
+# Import system fonts - only supports TrueType fonts
+# font_import() # This can take a while
+
+# Set the font to Calibri
+theme_set(theme_bw(base_family = "Calibri"))
+
+# Modify font size
+theme_update(plot.title = element_text(size = 12, face = "bold"),
+             axis.title.x = element_text(size = 12),
+             axis.title.y = element_text(size = 12),
+             axis.text.x = element_text(size = 12),
+             axis.text.y = element_text(size = 12),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 12))
+
+# Define plot
+visreg(log_reg_ov1_pv1_pv2, "retrospectively_reported_improvement", 
+       gg = TRUE, 
+       scale = "response",
+       jitter = TRUE) +
+  
+  # Modify y-axis label to present in two lines
+  labs(y = "Probability of Recovery(Yes)", 
+       x = "Improvement",
+       title = "Relationship Between Improvement Categories\nand NHSTT Treatment Outcome - Recovery,\nAccounting for Helpfulness",
+       subtitle = "Controlling For: Number of Treatment Sessions, Gender, and Age") +
+  
+    # Replace numeric values on the x-axis with corresponding labels
+  scale_x_continuous(labels = c("Much Worse", "Little Worse", "No Change", "Little Better", "Much Better")) +
+  
+  # Modify theme to APA7 style
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(linewidth = 1),
+        axis.ticks = element_line(linewidth = 0.5),
+        legend.position = "bottom",
+        legend.justification = "center",
+        legend.box = "horizontal")
+
+```
+# Visualise log_reg_ov2_pv1
+
+```{r}
+
+library(ggplot2)
+library(visreg)
+library(extrafont)
+
+# Import system fonts - only supports TrueType fonts
+# font_import() # This can take a while
+
+# Set the font to Calibri
+theme_set(theme_bw(base_family = "Calibri"))
+
+# Modify font size
+theme_update(plot.title = element_text(size = 12, face = "bold"),
+             axis.title.x = element_text(size = 12),
+             axis.title.y = element_text(size = 12),
+             axis.text.x = element_text(size = 12),
+             axis.text.y = element_text(size = 12),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 12))
+
+# Define plot
+visreg(log_reg_ov2_pv1, "retrospectively_reported_improvement", 
+       gg = TRUE, 
+       scale = "response",
+       jitter = TRUE) +
+  
+  # Modify y-axis label to present in two lines
+  labs(y = "Probability of Reliable Improvement(Yes)", 
+       x = "Improvement",
+       title = "Relationship Between Improvement Categories\nand NHSTT Treatment Outcome - Reliable Improvement",
+       subtitle = "Controlling For: Number of Treatment Sessions, Gender, and Age") +
+  
+  # Replace numeric values on the x-axis with corresponding labels
+  scale_x_continuous(labels = c("Much Worse", "Little Worse", "No Change", "Little Better", "Much Better")) +
+  
+  # Modify theme to APA7 style
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(linewidth = 1),
+        axis.ticks = element_line(linewidth = 0.5),
+        legend.position = "bottom",
+        legend.justification = "center",
+        legend.box = "horizontal")
+
+```
+
+# Visualise log_reg_ov2_pv2
+
+```{r}
+
+library(ggplot2)
+library(visreg)
+library(extrafont)
+
+# Import system fonts - only supports TrueType fonts
+# font_import() # This can take a while
+
+# Set the font to Calibri
+theme_set(theme_bw(base_family = "Calibri"))
+
+# Modify font size
+theme_update(plot.title = element_text(size = 12, face = "bold"),
+             axis.title.x = element_text(size = 12),
+             axis.title.y = element_text(size = 12),
+             axis.text.x = element_text(size = 12),
+             axis.text.y = element_text(size = 12),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 12))
+
+# Define plot
+visreg(log_reg_ov2_pv2, "retrospectively_treatment_helpful", 
+       gg = TRUE, 
+       scale = "response") +
+  
+  # Modify y-axis label to present in two lines
+  labs(y = "Probability of Reliable Improvement(Yes)", 
+       x = "Helpfulness",
+       title = "Relationship Between Helpfulness Categories\nand NHSTT Treatment Outcome - Reliable Improvement",
+       subtitle = "Controlling For: Number of Treatment Sessions, Gender, and Age") +
+  
+  # Modify theme to APA7 style
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(linewidth = 1),
+        axis.ticks = element_line(linewidth = 0.5),
+        legend.position = "bottom",
+        legend.justification = "center",
+        legend.box = "horizontal")
+
+```
+# Visualise log_reg_ov2_pv1_pv2
+
+```{r}
+
+library(ggplot2)
+library(visreg)
+library(extrafont)
+
+# Import system fonts - only supports TrueType fonts
+# font_import() # This can take a while
+
+# Set the font to Calibri
+theme_set(theme_bw(base_family = "Calibri"))
+
+# Modify font size
+theme_update(plot.title = element_text(size = 12, face = "bold"),
+             axis.title.x = element_text(size = 12),
+             axis.title.y = element_text(size = 12),
+             axis.text.x = element_text(size = 12),
+             axis.text.y = element_text(size = 12),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 12))
+
+# Define plot
+visreg(log_reg_ov2_pv1_pv2, "retrospectively_reported_improvement", 
+       gg = TRUE, 
+       scale = "response",
+       jitter = TRUE) +
+  
+  # Modify y-axis label to present in two lines
+  labs(y = "Probability of Reliable Improvement(Yes)", 
+       x = "Improvement",
+       title = "Relationship Between Improvement Categories\nand NHSTT Treatment Outcome - Reliable Improvement,\nAccounting for Helpfulness",
+       subtitle = "Controlling For: Number of Treatment Sessions, Gender, and Age") +
+  
+  # Replace numeric values on the x-axis with corresponding labels
+  scale_x_continuous(labels = c("Much Worse", "Little Worse", "No Change", "Little Better", "Much Better")) +
+  
+  # Modify theme to APA7 style
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(linewidth = 1),
+        axis.ticks = element_line(linewidth = 0.5),
+        legend.position = "bottom",
+        legend.justification = "center",
+        legend.box = "horizontal")
+
+```
+
+# Visualise log_reg_ov3_pv1
+
+```{r}
+
+library(ggplot2)
+library(visreg)
+library(extrafont)
+
+# Import system fonts - only supports TrueType fonts
+# font_import() # This can take a while
+
+# Set the font to Calibri
+theme_set(theme_bw(base_family = "Calibri"))
+
+# Modify font size
+theme_update(plot.title = element_text(size = 12, face = "bold"),
+             axis.title.x = element_text(size = 12),
+             axis.title.y = element_text(size = 12),
+             axis.text.x = element_text(size = 12),
+             axis.text.y = element_text(size = 12),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 12))
+
+# Define plot
+visreg(log_reg_ov3_pv1, "retrospectively_reported_improvement", 
+       gg = TRUE, 
+       scale = "response",
+       jitter = TRUE) +
+  
+  # Modify y-axis label to present in two lines
+  labs(y = "Probability of Reliable Recovery(Yes)", 
+       x = "Improvement",
+       title = "Relationship Between Improvement Categories\nand NHSTT Treatment Outcome - Reliable Recovery",
+       subtitle = "Controlling For: Number of Treatment Sessions, Gender, and Age") +
+  
+# Replace numeric values on the x-axis with corresponding labels
+  scale_x_continuous(labels = c("Much Worse", "Little Worse", "No Change", "Little Better", "Much Better")) +
+  
+  # Modify theme to APA7 style
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(linewidth = 1),
+        axis.ticks = element_line(linewidth = 0.5),
+        legend.position = "bottom",
+        legend.justification = "center",
+        legend.box = "horizontal")
+
+```
+
+# Visualise log_reg_ov3_pv2
+
+```{r}
+
+library(ggplot2)
+library(visreg)
+library(extrafont)
+
+# Import system fonts - only supports TrueType fonts
+# font_import() # This can take a while
+
+# Set the font to Calibri
+theme_set(theme_bw(base_family = "Calibri"))
+
+# Modify font size
+theme_update(plot.title = element_text(size = 12, face = "bold"),
+             axis.title.x = element_text(size = 12),
+             axis.title.y = element_text(size = 12),
+             axis.text.x = element_text(size = 12),
+             axis.text.y = element_text(size = 12),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 12))
+
+# Define plot
+visreg(log_reg_ov3_pv2, "retrospectively_treatment_helpful", 
+       gg = TRUE, 
+       scale = "response",
+       jitter = TRUE) +
+  
+  # Modify y-axis label to present in two lines
+  labs(y = "Probability of Reliable Recovery(Yes)", 
+       x = "Helpfulness",
+       title = "Relationship Between Helpfulness Categories\nand NHSTT Treatment Outcome - Reliable Recovery",
+       subtitle = "Controlling For: Number of Treatment Sessions, Gender, and Age") +
+  
+  # Modify theme to APA7 style
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(linewidth = 1),
+        axis.ticks = element_line(linewidth = 0.5),
+        legend.position = "bottom",
+        legend.justification = "center",
+        legend.box = "horizontal")
+
+```
+# Visualise log_reg_ov3_pv1_pv2
+
+```{r}
+
+library(ggplot2)
+library(visreg)
+library(extrafont)
+
+# Import system fonts - only supports TrueType fonts
+# font_import() # This can take a while
+
+# Set the font to Calibri
+theme_set(theme_bw(base_family = "Calibri"))
+
+# Modify font size
+theme_update(plot.title = element_text(size = 12, face = "bold"),
+             axis.title.x = element_text(size = 12),
+             axis.title.y = element_text(size = 12),
+             axis.text.x = element_text(size = 12),
+             axis.text.y = element_text(size = 12),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 12))
+
+# Define plot
+visreg(log_reg_ov3_pv1_pv2, "retrospectively_reported_improvement", 
+       gg = TRUE, 
+       scale = "response",
+       jitter = TRUE) +
+  
+  # Modify y-axis label to present in two lines
+  labs(y = "Probability of Reliable Recovery(Yes)", 
+       x = "Improvement",
+       title = "Relationship Between Improvement Categories\nand NHSTT Treatment Outcome - Reliable Recovery,\nAccounting for Helpfulness",
+       subtitle = "Controlling For: Number of Treatment Sessions, Gender, and Age") +
+  # Replace numeric values on the x-axis with corresponding labels
+  scale_x_continuous(labels = c("Much Worse", "Little Worse", "No Change", "Little Better", "Much Better")) +
+  
+  # Modify theme to APA7 style
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(linewidth = 1),
+        axis.ticks = element_line(linewidth = 0.5),
+        legend.position = "bottom",
+        legend.justification = "center",
+        legend.box = "horizontal")
+
+```
+
+## COHEN'S KAPPA for iapt treatment outcomes and Retrospective Reports of Treatment Helpfulness
+
+```{r}
+#install.packages("irr")  # Install the irr package if you haven't already
+library(irr)             # Load the irr package
+#CONTINGENCY TABLE for recovered 
+contingency_table = table(port_preprocessed_data$recovered, port_preprocessed_data$retrospectively_treatment_helpful)
+
+
+
+print(contingency_table)
+
+# Calculate the proportion of participants in each category
+proportion_table_a <- prop.table(contingency_table, margin = 1)
+
+print(proportion_table_a)
+
+```
+```{r}
+# reference: https://www.statology.org/cohens-kappa-in-r/
+library(psych)
+cohen.kappa(x=cbind(port_preprocessed_data$retrospectively_treatment_helpful, port_preprocessed_data$recovered))
+
+##NO AGREEMENT (.064) BETWEEN RECOVERED AND RETROSPECTIVELY TREATMENT HELPFUL
+```
+```{r}
+contingency_table2 = table(port_preprocessed_data$reliable_improvement, port_preprocessed_data$retrospectively_treatment_helpful)
+print(contingency_table2)
+cohen.kappa(x=cbind(port_preprocessed_data$retrospectively_treatment_helpful, port_preprocessed_data$reliable_improvement))
+##NO AGREEMENT (.058) BETWEEN RELIABLE IMPROVEMENT AND RETROSPECTIVELY TREATMENT HELPFUL
+
+# Calculate the proportion of participants in each category
+proportion_table_b <- prop.table(contingency_table2, margin = 1)
+
+print(proportion_table_b)
+```
+
+```{r}
+contingency_table3 = table(port_preprocessed_data$reliable_recovery, port_preprocessed_data$retrospectively_treatment_helpful)
+print(contingency_table3)
+cohen.kappa(x=cbind(port_preprocessed_data$retrospectively_treatment_helpful, port_preprocessed_data$reliable_recovery))
+##NO AGREEMENT (.056) BETWEEN RELIABLE RECOVERY AND RETROSPECTIVELY TREATMENT HELPFUL
+
+# Calculate the proportion of participants in each category
+proportion_table_c <- prop.table(contingency_table3, margin = 1)
+
+print(proportion_table_c)
+table(port_preprocessed_data$reliable_recovery)
+```
+
+
+```{r}
+
+# Create a contingency table using the table() function
+cross_tab <- table(port_preprocessed_data$recovered,port_preprocessed_data$retrospectively_reported_improvement)
+
+# Calculate the proportion of participants in each category
+proportion_table <- prop.table(cross_tab, margin = 1)
+
+# Display the proportion table
+print(proportion_table)
+
+```
+
+```{r}
+# Create a contingency table using the table() function
+cross_tab2 <- table(port_preprocessed_data$reliable_improvement, port_preprocessed_data$retrospectively_reported_improvement)
+
+# Calculate the proportion of participants in each category
+proportion_table2 <- prop.table(cross_tab2, margin = 1)
+
+# Display the proportion table
+print(proportion_table2)
+```
+```{r}
+# Create a contingency table using the table() function
+cross_tab3 <- table(port_preprocessed_data$reliable_recovery, port_preprocessed_data$retrospectively_reported_improvement)
+
+# Calculate the proportion of participants in each category
+proportion_table3 <- prop.table(cross_tab3, margin = 1)
+
+# Display the proportion table
+print(proportion_table3)
+```
+```{r}
+table(port_preprocessed_data$reliable_recovery)
+table(port_preprocessed_data$recovered)
+```
+
+## AGREEMENT PLOTS
+
+
+
+```{r}
+#Calculating the proportions for the IMPROVEMENT plot 
+#Reminder about the encoding of the columns:
+#   NHS Talking Therapies categories : 1 = Yes, 2 = No 
+#   Improvement variable : 
+      # 4 = Much better
+      # 3 = Little better
+      # 2 = No change
+      # 1 = Little worse
+      # 0 = Much worse
+
+#RECOVERY YES 
+#N participants in each Yes or No
+recovered_distribution <- table(port_preprocessed_data$recovered)
+print(recovered_distribution)
+
+# Filter data for prcpts with a value of 1 in 'recovered'
+recovered_yes_participants <- port_preprocessed_data[port_preprocessed_data$recovered == 1, ]
+
+# Calculating the frequency of values for participants with recovered = 1
+frequency_recovered_yes <- table(recovered_yes_participants$retrospectively_reported_improvement)
+
+# Print the frequency table
+print(frequency_recovered_yes)
+
+#RECOVERY NO
+
+# Filter data for prcpts with a value of 0 in 'recovered'
+recovered_no_participants <- port_preprocessed_data[port_preprocessed_data$recovered == 0, ]
+
+# Calculating the frequency of values for participants with recovered = 0
+frequency_recovered_no <- table(recovered_no_participants$retrospectively_reported_improvement)
+
+# Print the frequency table
+print(frequency_recovered_no)
+
+```
+
+```{r}
+#RELIABLE IMPROVEMENT YES 
+#N participants in each Yes or No
+RI_distribution <- table(port_preprocessed_data$reliable_improvement)
+print(RI_distribution)
+
+# Filter data for prcpts with a value of 1 in 'recovered'
+RI_yes_participants <- port_preprocessed_data[port_preprocessed_data$reliable_improvement == 1, ]
+
+# Calculating the frequency of values for participants with recovered = 1
+frequency_RI_yes <- table(RI_yes_participants$retrospectively_reported_improvement)
+
+# Print the frequency table
+print(frequency_RI_yes)
+
+#RELIABLE IMPROVEMENT NO
+# Filter data for prcpts with a value of 0 in 'recovered'
+RI_no_participants <- port_preprocessed_data[port_preprocessed_data$reliable_improvement == 0, ]
+
+# Calculating the frequency of values for participants with recovered = 0
+frequency_RI_no <- table(RI_no_participants$retrospectively_reported_improvement)
+
+# Print the frequency table
+print(frequency_RI_no)
+```
+
+
+```{r}
+#RELIABLE RECOVERY YES 
+#N participants in each Yes or No
+RR_distribution <- table(port_preprocessed_data$reliable_recovery)
+print(RR_distribution)
+
+# Filter data for prcpts with a value of 1 in 'recovered'
+RR_yes_participants <- port_preprocessed_data[port_preprocessed_data$reliable_recovery == 1, ]
+
+# Calculating the frequency of values for participants with recovered = 1
+frequency_RR_yes <- table(RR_yes_participants$retrospectively_reported_improvement)
+
+# Print the frequency table
+print(frequency_RR_yes)
+
+#RELIABLE RCOVERY NO
+# Filter data for prcpts with a value of 0 in 'recovered'
+RR_no_participants <- port_preprocessed_data[port_preprocessed_data$reliable_recovery == 0, ]
+
+# Calculating the frequency of values for participants with recovered = 0
+frequency_RR_no <- table(RR_no_participants$retrospectively_reported_improvement)
+
+# Print the frequency table
+print(frequency_RR_no)
+```
+
+
+
+```{r}
+# Load the required library
+library(ggplot2)
+
+# Create a data frame 
+data_helpfulness <- data.frame(
+  Variable = rep(c("Recovery", "Reliable Improvement", "Reliable Recovery"), each = 4),
+  Agreement = rep(c("Yes Yes", "No No", "Yes No", "No Yes"), times = 3),
+  Proportion = c(0.46, 0.21, 0.06, 0.27, 0.48, 0.16, 0.09, 0.27, 0.36, 0.23, 0.05, 0.36)
+)
+
+# Specify desired order of levels for the Agreement factor
+agreement_order <- c("No No", "Yes No", "No Yes", "Yes Yes")
+
+
+# Create the agreement figure using ggplot2
+agreement_plot_helpfulness <- ggplot(data_helpfulness, aes(x = Proportion, y = Variable, fill = factor(Agreement, levels = agreement_order))) +
+  geom_bar(stat = "identity", position = "stack", width = 0.3) +
+  scale_fill_manual(values = c("Yes Yes" = "#117733", "No No" = "#882255", "Yes No" = "#88CCEE", "No Yes" = "#332288")) +
+  labs(title = expression("Agreement Between " * italic("Helpfulness") * " \n and NHS Talking Therapies Treatment Outcomes")) +
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),  # Remove axis titles
+    legend.title = element_blank(),
+    text = element_text(size = 12),
+    legend.text = element_text(size = 12),  # Adjust legend label font size
+    axis.text.y = element_text(size = 12),  # Adjust y-axis text (variable names) font size# Remove legend title
+    )
+
+# Print the plot
+print(agreement_plot_helpfulness)
+
+
+
+```
+
+
+```{r}
+# Load the required library
+
+library(ggplot2)
+
+# Create a data frame with your data
+data_improvement <- data.frame(
+  Variable = rep(c("Recovery: Yes","Recovery: No", "Reliable Improvement: Yes", "Reliable Improvement: No", "Reliable Recovery: Yes", "Reliable Recovery: No"), each = 5),
+  Improvement = rep(c("Much Better", "Little Better", "No Change","Little Worse", "Much Worse"), times = 6),
+  Proportion = c(0.390625,
+                0.468750,
+                0.140625,
+                0.000000,
+                0.000000,
+                0.083333,
+                0.433333,
+                0.400000,
+                0.050000,
+                0.033333,
+                0.376623,
+                0.493506,
+                0.129870,
+                0.000000,
+                0.000000,
+                0.086207,
+                0.413793,
+                0.413793,
+                0.051724,
+                0.034483,
+                0.444444,
+                0.444444,
+                0.111111,
+                0.000000,
+                0.000000,
+                0.085714,
+                0.457143,
+                0.385714,
+                0.042857,
+                0.028571)
+                )
+
+#The values above were not entered manually but pasted from an excel sheet where the proportions were calculated 
+# Specify the desired order of levels for the Improvement factor
+improvement_order <- c("Much Worse", "Little Worse", "No Change", "Little Better", "Much Better")
+
+# Create the agreement figure using ggplot2
+agreement_plot_improvement <- ggplot(data_improvement, aes(x = Proportion, y = Variable, fill = factor(Improvement, levels = improvement_order))) +
+  geom_bar(stat = "identity", position = "stack", width = 0.5) +
+  scale_fill_manual(values = c("Much Better" = "#117733", "Little Better" = "#332288", "No Change" = "#88CCEE", "Little Worse" = "#DDCC77", "Much Worse" = "#882255")) +
+  labs(title = expression("Agreement Between " * italic("Helpfulness") * " \n and NHS Talking Therapies Treatment Outcomes")) +
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),  # Remove axis titles
+    legend.title = element_blank(),
+    text = element_text(size = 12),
+    legend.text = element_text(size = 12),  # Adjust legend label font size
+    axis.text.y = element_text(size = 12)  # Adjust y-axis text (variable names) font size
+  )
+
+# Print the plot
+print(agreement_plot_improvement)
+
+```
+```{r}
+library(patchwork) 
+agreement_plot_combined = agreement_plot_helpfulness + agreement_plot_improvement + plot_layout(nrow=2)
+print(agreement_plot_combined)
+```
+## REVISED FOREST PLOT
+
+```{r}
+library(sjPlot)
+log_reg_forest_plot <- plot_models(log_reg_ov1_pv2, log_reg_ov1_pv1, log_reg_ov1_pv1_pv2, log_reg_ov2_pv2, log_reg_ov2_pv1, log_reg_ov2_pv1_pv2, log_reg_ov3_pv2, log_reg_ov3_pv1, log_reg_ov3_pv1_pv2,
+  transform = "exp",
+  std.est = NULL,
+  std.response = TRUE,
+  rm.terms = c("ieso_treatment_completed_total", "demographics_gender", "demographics_age_at_screening"),
+  title = NULL,
+  m.labels = NULL,
+  legend.title = "Models",
+  legend.pval.title = "p",
+  axis.labels = c("Improvement", "Helpfulness"),
+  axis.title = "Odds Ratios (95% CI)",
+  axis.lim = NULL,
+  wrap.title = 50,
+  wrap.labels = 25,
+  wrap.legend.title = 20,
+  grid.breaks = NULL,
+  dot.size = 3,
+  line.size = NULL,
+  value.size = NULL,
+  spacing = 0.5,
+  colors =  c("#332288", "#88CCEE", "#88CCEE", "#117733", "#999933", "#999933", "#DDCC77", "#882255","#882255"),
+  show.values = FALSE,
+  show.legend = TRUE,
+  show.intercept = FALSE,
+  show.p = TRUE,
+  p.shape = TRUE,
+  p.threshold = c(0.05),
+  p.adjust = NULL,
+  ci.lvl = 0.95,
+  robust = FALSE,
+  vcov.fun = NULL,
+  vcov.type = NULL,
+  vcov.args = NULL,
+  vline.color = "black",
+  digits = 2,
+  grid = FALSE,
+  auto.label = TRUE,
+  prefix.labels = c("none", "varname", "label")
+)+
+theme(axis.text.x = element_text(size=12),axis.text.y = element_text(size = 12)) +
+  theme_minimal()
+
+print(log_reg_forest_plot)
+```
+
+
+
+
+
+

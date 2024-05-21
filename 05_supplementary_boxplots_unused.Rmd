@@ -1,0 +1,1184 @@
+---
+title: "05_supplementary_boxplots"
+author: "Caroline"
+date: "2023-09-05"
+output: html_document
+---
+---
+title: "02_linear-regressions"
+author: "Caroline"
+date: '2023-07-13'
+output: html_document
+---
+
+```{r}
+#Clear the environment
+rm(list = ls())
+
+#Set Working directory
+
+```
+
+
+```{r}
+
+#Loading the neccessary packages
+# Users have to maker sure that they have been installed first
+
+library(tidyverse)
+library(ggpubr) # to visualise linear regression assumption of normality
+library(car) # to test assumption (3) homogeneity of variance
+library(dplyr) # to allow for piping
+library(corrplot) # used to check assumption (5) of multicolinearity, as it is necessary to plot a correlation matrix for this. 
+library(moments) # to assess the skewness and kurtosis of the non-normal variables. 
+library(MASS) # to conduct the box-cox transformation of the delta phq9 variable. 
+library(car) # to ckeck assumption (5) of multicollinearity by computing the Variance Inflation Factor. 
+library(psych) # to compute the correlation matrix and further check the assumption (5) of multicollinearity. 
+library(ggplot2) # to visualise the linear regressions
+library(effectsize) #For computing the effect sizes of the t-tests
+
+```
+
+```{r}
+
+#Load the preprocessed dataset into an object
+#This line of code works to load the port data
+port_preprocessed_data <- readRDS("flare-kurf-port-data-2023.rds")
+
+#Checking that it works, and loaded the data correctly
+view(port_preprocessed_data)
+
+```
+
+
+```{r}
+
+#change demographics_gender into a numeric variable 
+#(non_binary -> 0, male -> 1, female -> 2)
+port_preprocessed_data <- port_preprocessed_data %>%
+  mutate(demographics_gender = ifelse(demographics_gender == "female", 2,
+                                      ifelse(demographics_gender == "male", 1, 0)))
+
+```
+
+
+```{r}
+# Computing linear regression models, all models have the following co-variates: number of treatment sessions, gender, and age. These are computed before the relevant assumption checks, because the fitted models are necessary for some of the assumption checks. 
+
+# 1 = Retrospective symptom improvement
+# 2 = Retrospective treatment helpfulness
+# 3 = 1 & 2 combined
+
+# A = Delta PHQ-9
+# B = Delta GAD-7
+# C = Delta WSAS
+
+#Computing linear regression 1A using retrospective symptom improvement as a predictor variable, and delta PHQ-9 as an outcome variable. 
+
+linear_regression_1A <- lm(delta_phq9 ~ retrospectively_reported_improvement + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_1A)
+
+#Computing linear regression 1B using retrospective symptom improvement as a predictor variable, and delta GAD-7 outcome variable. 
+
+linear_regression_1B <- lm(delta_gad7 ~ retrospectively_reported_improvement + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_1B)
+
+#Computing linear regression 1C using retrospective symptom improvement as a predictor variable, and delta WSAS as an outcome variable. 
+
+linear_regression_1C <- lm(delta_wsas ~ retrospectively_reported_improvement + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+
+summary(linear_regression_1C)
+
+```
+
+
+
+```{r}
+
+#Computing linear regression 2A using retrospective treatment helpfulness as a predictor variable, and delta PHQ-9 as an outcome variable. 
+
+linear_regression_2A <- lm(delta_phq9 ~ retrospectively_treatment_helpful + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_2A)
+
+
+#Computing linear regression 2B using retrospective treatment helpfulness as a predictor variable, and recovered as an outcome variable. 
+
+linear_regression_2B <- lm(delta_gad7 ~ retrospectively_treatment_helpful + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_2B)
+
+
+#Computing linear regression 2C using retrospective treatment helpfulness as a predictor variable, and reliable recovery as an outcome variable. 
+
+linear_regression_2C <- lm(delta_wsas ~ retrospectively_treatment_helpful + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_2C)
+
+```
+
+
+```{r}
+
+#Computing linear regression 3A using retrospective treatment helpfulness as a predictor variable, and delta PHQ-9 as an outcome variable. 
+
+linear_regression_3A <- lm(delta_phq9 ~ retrospectively_reported_improvement + retrospectively_treatment_helpful + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_3A)
+
+
+#Computing linear regression 3B using retrospective treatment helpfulness as a predictor variable, and delta GAD-7 as an outcome variable. 
+
+linear_regression_3B <- lm(delta_gad7 ~ retrospectively_reported_improvement + retrospectively_treatment_helpful + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_3B)
+
+
+#Computing linear regression 3C using retrospective treatment helpfulness as a predictor variable, and delta WSAS as an outcome variable. 
+
+linear_regression_3C <- lm(delta_wsas ~ retrospectively_reported_improvement + retrospectively_treatment_helpful + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_3C)
+
+```
+
+
+## Assumptions-checking for Linear Regression 1
+(1)Linearity of the data. 
+The relationship between the predictor (x) and the outcome (y) is assumed to be linear.
+
+(2)Normality of residuals. 
+The residual errors are assumed to be normally distributed.
+
+(3)Homogeneity of variance. 
+The residuals are assumed to have a constant variance (homoscedasticity)
+
+(4)Independence
+
+(5)No excessive multicollinearity
+
+
+```{r}
+#Checking assumption (1) linearity, by generating relevant figures
+
+plot_1A <- ggscatter(data = port_preprocessed_data, x = "retrospectively_reported_improvement", y = "delta_phq9", alpha = 0.1) + geom_smooth(method = lm)
+plot_1B <- ggscatter(data = port_preprocessed_data, x = "retrospectively_reported_improvement", y = "delta_gad7", alpha = 0.1) + geom_smooth(method = lm)
+plot_1C <- ggscatter(data = port_preprocessed_data, x = "retrospectively_reported_improvement", y = "delta_wsas", alpha = 0.1) + geom_smooth(method = lm)
+
+plot_2A <- ggscatter(data = port_preprocessed_data, x = "retrospectively_treatment_helpful", y = "delta_phq9", alpha = 0.1) + geom_smooth(method = lm)
+plot_2B <- ggscatter(data = port_preprocessed_data, x = "retrospectively_treatment_helpful", y = "delta_gad7", alpha = 0.1) + geom_smooth(method = lm)
+plot_2C <- ggscatter(data = port_preprocessed_data, x = "retrospectively_treatment_helpful", y = "delta_wsas", alpha = 0.1) + geom_smooth(method = lm)
+
+
+#Checking the covariates for both of the predicting variables
+plot_cov1_1 <- ggscatter(data = port_preprocessed_data, x = "retrospectively_reported_improvement", y = "ieso_treatment_completed_total", alpha = 0.1) + geom_smooth(method = lm)
+plot_cov1_2 <- ggscatter(data = port_preprocessed_data, x = "retrospectively_reported_improvement", y = "demographics_age_at_screening", alpha = 0.1) + geom_smooth(method = lm)
+plot_cov1_3 <- ggscatter(data = port_preprocessed_data, x = "retrospectively_reported_improvement", y = "demographics_gender", alpha = 0.1) + geom_smooth(method = lm)
+
+plot_cov2_1 <- ggscatter(data = port_preprocessed_data, x = "retrospectively_treatment_helpful", y = "ieso_treatment_completed_total", alpha = 0.1) + geom_smooth(method = lm)
+plot_cov2_2 <- ggscatter(data = port_preprocessed_data, x = "retrospectively_treatment_helpful", y = "demographics_age_at_screening", alpha = 0.1) + geom_smooth(method = lm)
+plot_cov2_3 <- ggscatter(data = port_preprocessed_data, x = "retrospectively_treatment_helpful", y = "demographics_gender", alpha = 0.1) + geom_smooth(method = lm)
+
+ggarrange(plot_1A, plot_1B, plot_1C, plot_2A, plot_2B, plot_2C, plot_cov1_1, plot_cov1_2, plot_cov1_3, plot_cov2_1, plot_cov2_2, plot_cov2_3, Ancol = 2)
+
+# Based on these plots, it appears as though the assumption of linearity is met in all the variables to be included in the linear regressions. 
+
+```
+
+```{r}
+
+#Checking assumption (2) by assessing the normality of residuals. Doing this by checking whether the residuals vs. fitted line is horizontal. This assumption will be checked by computing both the graphs below and Q-Q plots.
+
+plot(linear_regression_1A, 1)
+plot(linear_regression_1B, 1)
+plot(linear_regression_1C, 1)
+
+plot(linear_regression_2A, 1)
+plot(linear_regression_2B, 1)
+plot(linear_regression_2C, 1)
+
+plot(linear_regression_3A, 1)
+plot(linear_regression_3B, 1)
+plot(linear_regression_3C, 1)
+
+#The lines for all the plots above are mostly horizontal. Therefore, it is assumed that the second assumption, normality of residuals is met as well. 
+
+```
+
+```{r}
+# Checking assumption (2) normality of residuals using another method by computing Q-Q plots and conducting a Shapiro test. These plots can be used to visually check the normality assumption. Here, the normal probability plot of residuals should approximately follow a straight line. 
+
+##DO WE HAVE TO TEST THESE SEPARATELY FOR THE COVARIATES? I DON'T THINK SO, BECAUSE THE COVARIATES ARE INCLUDED IN THESE MODELS. 
+
+plot(linear_regression_1A, 2)
+plot(linear_regression_1B, 2)
+plot(linear_regression_1C, 2)
+
+plot(linear_regression_2A, 2)
+
+plot(linear_regression_2B, 2)
+plot(linear_regression_2C, 2)
+
+plot(linear_regression_3A, 2)
+plot(linear_regression_3B, 2)
+plot(linear_regression_3C, 2)
+
+
+# A visual assessment of the following Q-Q plots suggests that assumption (2) normality of residuals is met in the present dataset.  
+
+
+```
+
+```{r}
+# Conducting a shapiro test as another method to test the assumption of normality. 
+
+shapiro.test(linear_regression_1A$residuals)
+shapiro.test(linear_regression_1B$residuals)
+shapiro.test(linear_regression_1C$residuals)
+
+shapiro.test(linear_regression_2A$residuals)
+shapiro.test(linear_regression_2B$residuals)
+shapiro.test(linear_regression_2C$residuals)
+
+shapiro.test(linear_regression_3A$residuals)
+shapiro.test(linear_regression_3B$residuals)
+shapiro.test(linear_regression_3C$residuals)
+
+# However, the p-values obtained by conducting a Shapiro test were significant in the following models 1A, 2A, and 3A. Based on the results from the Shapiro Wilk test, this suggests that the assumption of the normality of residuals is violated in the delta PHQ-9 variable. 
+
+```
+
+```{r}
+
+# Computing test of skewness and kurtosis for the variables where the normality was violated in order to better understand how the distribution is non-normal. 
+
+skewness(port_preprocessed_data$delta_phq9)
+
+#The skewness is -.402, the negative value suggests that it is left skewed, but the magnitude of the skew is not above 1. This suggests that it should not be the skewness of the data responsible for the violation of the assumption of normality in this case. 
+
+kurtosis(port_preprocessed_data$delta_phq9)
+
+#The kurtosis is 4.49 for the distribution of scores on the delta PHQ-9. As this is clearly above a magnitude of 1, it suggests that the distribution is thinner than a normal distribution (leptokurtic). Based on these findings, it appears reasonable to assume that the high kurtosis is what is leading to a violation of the assumption of normality in this case. 
+
+```
+
+
+```{r}
+##Attempting to correct the violation of the assumption using a logarithmic transformation. 
+
+##What Patrycja did in her dissertation, was to log-transform the variable that was violating the assumption, and check whether the results differ significantly from the non-log transformed one. Because they were not significantly different, she then interpreted the non-log transformed one for comparability and ease of interpretation. 
+
+# Based on the above results from the Shapiro-Wilk test, I am now going to run the three linear regressions which include delta PHQ-9, using the log-transformed delta-PHQ-9. If these do not significantly differ from the non-log-transformed results, then I will move forwards with the non-log-transformed results, to facilitate comparability between the results, and ease of interpretation. 
+
+# To this end, computing a new variable that contains the log transformed delta_phq9 
+port_preprocessed_data <- port_preprocessed_data %>% 
+  mutate(log_delta_phq9 = (log(delta_phq9)))
+
+
+port_preprocessed_data <- port_preprocessed_data %>%
+  mutate(log_delta_phq9 = log(delta_phq9),
+         shifted_log_delta_phq9 = log_delta_phq9 - min(log_delta_phq9) + 1)
+
+View(port_preprocessed_data)
+
+#Because the delta_phq9 has quite a few negative values, it results in a lot of NaNs after the logarithmic transformation. This leads to an error message in the regression analyses that follow. 
+
+
+#linear_regression_1A_log <- lm((log_delta_phq9 + 22 +1) ~ retrospectively_reported_improvement + ieso_treatment_completed_n + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+#linear_regression_2A_log <- lm((log_delta_phq9 +1) ~ retrospectively_treatment_helpful + ieso_treatment_completed_n + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+#linear_regression_3A_log <- lm((log_delta_phq9 +1) ~ retrospectively_reported_improvement + retrospectively_treatment_helpful + ieso_treatment_completed_n + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+#The above linear regressions produce error results, because the log transformed delta PHQ-9 contains to many errors.
+#One way of addressing this issue is to shift the scale of the log transformed delta PHQ-9 such that there are no negative values. 
+
+#Checking what the minimum value of the delta_phq9 variable is, such that I can shift the distribution by this many units. 
+min(port_preprocessed_data$delta_phq9)
+
+#The minimum value is -21, meaning that I will add 22 to the scale, such that the initial value of zero is shifted to 21. 
+#port_preprocessed_data <- port_preprocessed_data %>% 
+ # mutate(logplus22_delta_phq9 = (log_delta_phq9 + 22))
+
+#Checking the minimum and the kurtosis of this transformation indicates that the transformation did not have the desired effect on the normality of the distribution. 
+
+
+```
+
+
+```{r}
+#Computing the regressions with the log-transformed PHQ-9 variables.
+
+#Computing linear regression 1A_log using retrospective symptom improvement as a predictor variable, and delta PHQ-9 as an outcome variable. 
+
+linear_regression_1A_log <- lm(log(delta_phq9 + 22) ~ retrospectively_reported_improvement + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_1A_log)
+#Computing linear regression 2A_log using retrospective treatment helpfulness as a predictor variable, and delta PHQ-9 as an outcome variable. 
+
+linear_regression_2A_log <- lm(log(delta_phq9 + 22) ~ retrospectively_treatment_helpful + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_2A_log)
+
+#Computing linear regression 3A_log using retrospective treatment helpfulness as a predictor variable, and delta PHQ-9 as an outcome variable. 
+
+linear_regression_3A_log <- lm(log(delta_phq9 + 22) ~ retrospectively_reported_improvement + retrospectively_treatment_helpful + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+
+summary(linear_regression_3A_log)
+
+
+```
+
+
+```{r}
+lin_reg_test = lm(log(delta_phq9 + 22) ~ retrospectively_reported_improvement + ieso_treatment_completed_total + demographics_gender + demographics_age_at_screening, port_preprocessed_data)
+summary(lin_reg_test)
+```
+
+
+```{r}
+log_phq9_corrected = log(port_preprocessed_data$delta_phq9 + 22)
+print(log_phq9_corrected)
+```
+
+
+```{r}
+#Another way of correcting the violation of this assumption is to conduct a square-root transformation. 
+
+port_preprocessed_data$squareroot_delta_phq9 <- sqrt(port_preprocessed_data$delta_phq9)
+
+#Having the same issue with values in the dataset that are NaNs (= Not a Number). 
+# Have found the suggestion of using the absolute values and then conduct a square root transformation. But then this changes the data significantly, and I am not sure this could be used in the linear regressions. 
+
+# Code for absolute value and square root transformation
+# port_preprocessed_data$absolute_squareroot_delta_phq9 <- sqrt(abs(port_preprocessed_data$delta_phq9))
+
+```
+
+```{r}
+# Alternatively, the data can be changed using a box-cox transformation. This may be justified in this case because it allows to normalise a wide range of distributional shapes, and can handle both negative and positive values. 
+
+# Estimate lambda value 
+#lambda_boxcox_transformation <- boxcox(port_preprocessed_data$delta_phq9 ~ 1, data = port_preprocessed_data)$lambda
+
+# Apply Box-Cox transformation
+#port_preprocessed_data$transformed_phq9_boxcox <- (port_preprocessed_data$delta_phq9^lambda - 1) / lambda
+
+```
+
+
+```{r}
+
+#Testing whether the regression models are significantly different from one another. This will be done by (1) plotting them on the same graph to visually assess their differences and (2) comparing whether they have comparable levels of significance and effect sizes. 
+
+```
+
+
+
+```{r}
+#Checking assumption (3) homogeneity of variance 
+
+plot(linear_regression_1A,3)
+plot(linear_regression_1B,3)
+plot(linear_regression_1C,3)
+
+ncvTest(linear_regression_1A)
+ncvTest(linear_regression_1B)
+ncvTest(linear_regression_1C)
+
+plot(linear_regression_2A,3)
+plot(linear_regression_2B,3)
+plot(linear_regression_2C,3)
+
+ncvTest(linear_regression_2A)
+ncvTest(linear_regression_2B)
+ncvTest(linear_regression_2C)
+
+plot(linear_regression_3A,3)
+plot(linear_regression_3B,3)
+plot(linear_regression_3C,3)
+
+ncvTest(linear_regression_3A)
+ncvTest(linear_regression_3B)
+ncvTest(linear_regression_3C)
+
+# The p-values for all the non-constant variance score tests are non-significant, suggesting that the assumption of homogeneity of variance is met. 
+# The plots suggest that the residuals are spread equally along the range of predictors. It is good if they display a horizontal line with equally spread points. 
+
+```
+
+
+```{r}
+##NEED TO DOULBE CHECK THE CODE THAT FOLLOWS 
+
+# Checking the assumption (x) (4?) Outliers and high levarage points
+# When data points have high Cook's distance scores and are to the upper or lower right of the leverage plot, they have leverage meaning they are influential to the regression results. The regression results will be altered if we exclude those cases.
+
+plot(linear_regression_1A,5)
+plot(linear_regression_1B,5)
+plot(linear_regression_1C,5)
+
+plot(linear_regression_2A,5)
+plot(linear_regression_2B,5)
+plot(linear_regression_2C,5)
+
+plot(linear_regression_3A,5)
+plot(linear_regression_3B,5)
+plot(linear_regression_3C,5)
+
+
+#Need to think about the interpretation of Cook's distance. 
+
+```
+
+```{r}
+# It is assumed that the assumption of independence (4) is met in the present dataset because of the between-subjects nature of the study design. 
+
+```
+
+
+```{r}
+
+#Checking assumption (5) of multicollinearity. Checking this by computing the variance inflation factor. The Variance Inflation Factor (VIF) measures the severity of multicollinearity in regression analysis. It is a statistical concept that indicates the increase in the variance of a regression coefficient as a result of collinearity.
+# The value for VIF starts at 1 and has no upper limit. A general rule of thumb for interpreting VIFs is as follows:
+#A value of 1 indicates there is no correlation between a given predictor variable and any other predictor variables in the model.
+#A value between 1 and 5 indicates moderate correlation between a given predictor variable and other predictor variables in the model, but this is often not severe enough to require attention.
+#A value greater than 5 indicates potentially severe correlation between a given predictor variable and other predictor variables in the model. In this case, the coefficient estimates and p-values in the regression output are likely unreliable. 
+
+
+vif(linear_regression_1A)
+vif(linear_regression_1B)
+vif(linear_regression_1C)
+
+vif(linear_regression_2A)
+vif(linear_regression_2B)
+vif(linear_regression_2C)
+
+vif(linear_regression_3A)
+vif(linear_regression_3B)
+vif(linear_regression_3C)
+
+#None of the variance inflation factors above have a magnitude higher than 2, suggesting that there is some correlation between the variables, but these are not high enough to require attention. As a result, it is assumed that the assumption of multicollinearity is met in the present dataset.
+
+```
+
+
+```{r}
+# Further checking this assumption by computing a correlation matrix between the variables. 
+# Creating a new dataset to facilitate the visualisation of the correlation matrix. 
+linear_regression_data <- subset(port_preprocessed_data, select = c("delta_phq9", "delta_gad7", "delta_wsas", "retrospectively_reported_improvement", "retrospectively_treatment_helpful", "ieso_treatment_completed_n","demographics_gender", "demographics_age_at_screening"))
+
+View(linear_regression_data)
+
+corr.test(linear_regression_data, adjust = "none")
+
+corPlot(linear_regression_data, diag = F, zlim = c(.0,1), upper = F, numbers = TRUE, cex.axis =.5)
+
+#The correlations between delta GAD-7. PHQ-9 and WSAS are relatively high in their magnitude, however this may be expected given the high co-morbidity between these constructs assessed by these variables. 
+
+```
+
+
+```{r}
+#Computing independent samples t-tests to check whether the differences in symptom severity are significantly different for the yes and no groups in each 
+
+#GAD-7
+
+
+t.test(port_preprocessed_data$delta_gad7 ~ port_preprocessed_data$recovered, var.equal = TRUE)
+
+cohens_d(delta_gad7 ~ recovered, data = port_preprocessed_data)
+
+t.test(port_preprocessed_data$delta_gad7 ~ port_preprocessed_data$reliable_improvement, var.equal = TRUE)
+
+cohens_d(delta_gad7 ~ reliable_improvement, data = port_preprocessed_data)
+
+t.test(port_preprocessed_data$delta_gad7 ~ port_preprocessed_data$reliable_recovery, var.equal = TRUE)
+
+cohens_d(delta_gad7 ~ reliable_recovery, data = port_preprocessed_data)
+
+
+```
+
+
+```{r}
+#Computing independent samples t-tests to check whether the differences in symptom severity are significantly different for the yes and no groups in each 
+
+#PHQ-9
+
+t.test(port_preprocessed_data$delta_phq9 ~ port_preprocessed_data$recovered, var.equal = TRUE)
+
+cohens_d(delta_phq9 ~ recovered, data = port_preprocessed_data)
+
+
+t.test(port_preprocessed_data$delta_phq9 ~ port_preprocessed_data$reliable_improvement, var.equal = TRUE)
+
+cohens_d(delta_phq9 ~ reliable_improvement, data = port_preprocessed_data)
+
+
+t.test(port_preprocessed_data$delta_phq9 ~ port_preprocessed_data$reliable_recovery, var.equal = TRUE)
+
+cohens_d(delta_phq9 ~ reliable_recovery, data = port_preprocessed_data)
+
+
+```
+
+```{r}
+#Computing independent samples t-tests to check whether the differences in symptom severity are significantly different for the yes and no groups in each 
+
+#WSAS
+t.test(port_preprocessed_data$delta_wsas ~ port_preprocessed_data$recovered, var.equal = TRUE)
+
+cohens_d(delta_wsas ~ recovered, data = port_preprocessed_data)
+
+
+t.test(port_preprocessed_data$delta_wsas ~ port_preprocessed_data$reliable_improvement, var.equal = TRUE)
+
+cohens_d(delta_wsas ~ reliable_improvement, data = port_preprocessed_data)
+
+
+t.test(port_preprocessed_data$delta_wsas ~ port_preprocessed_data$reliable_recovery, var.equal = TRUE)
+
+cohens_d(delta_wsas ~ reliable_recovery, data = port_preprocessed_data)
+
+
+```
+
+
+### FORREST PLOT:
+
+
+```{r}
+# create a data frame with model coefficients and p-values
+linear_models_data <- data.frame(
+  model = c("OV = Delta PHQ-9", "OV = Delta GAD-7", "OV = Delta WSAS", "OV = Delta PHQ-9 ", "OV = Delta GAD-7 ", "OV = Delta WSAS "),
+  term = c("Retrospective Reports of Improvement", "Retrospective Reports of Improvement","Retrospective Reports of Improvement","Retrospectively Treatment Helpful", "Retrospectively Treatment Helpful", "Retrospectively Treatment Helpful"),
+  beta = c(coef(linear_regression_1A)[2], coef(linear_regression_1B)[2], coef(linear_regression_1C)[2], coef(linear_regression_2A)[2], coef(linear_regression_2B)[2], coef(linear_regression_2C)[2]),
+  se = c(summary(linear_regression_1A)$coefficients[2, 2], summary(linear_regression_1B)$coefficients[2, 2],  summary(linear_regression_1C)$coefficients[2, 2], summary(linear_regression_2A)$coefficients[2, 2], summary(linear_regression_2B)$coefficients[2, 2],  summary(linear_regression_2C)$coefficients[2, 2]),
+  p = c(summary(linear_regression_1A)$coefficients[2, 4], summary(linear_regression_1B)$coefficients[2, 4],  summary(linear_regression_1C)$coefficients[2, 4], summary(linear_regression_2A)$coefficients[2, 4], summary(linear_regression_2B)$coefficients[2, 4],  summary(linear_regression_2C)$coefficients[2, 4])
+)
+
+# create a faceted forest plot
+ggplot(linear_models_data, aes(x = beta, y = term, xmin = beta - 1.96*se, xmax = beta + 1.96*se, label = sprintf("%0.2f", beta), color = ifelse(p < 0.05, "green", "blue"))) +
+  geom_point(size = 3) +
+  geom_errorbarh(height = 0.5, linewidth = 0.5) +
+  geom_vline(xintercept = 0, size = 0.5, linetype = "dashed") +
+  facet_wrap(~ model, scales = "free", ncol = 1) +
+  scale_color_identity() +
+  theme_minimal() +
+  scale_x_continuous(limits = c(-6, 1), breaks = round(seq(-6, 1, by = 1),1)) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_blank(),
+        legend.position = "none") +
+  labs(x = "Coefficient",
+       y = "") +
+  guides(fill = guide_legend(title = "p < 0.05", override.aes = list(size = 3)))
+
+```
+
+```{r}
+# Increase plot size and adjust margins
+options(repr.plot.width = 10, repr.plot.height = 6)
+par(mar = c(5, 6, 4, 2))  # Adjust the margin for the plot (bottom, left, top, right)
+
+# Your existing code for linear_models_data...
+
+# create a faceted forest plot with adjustments
+ggplot(linear_models_data, aes(x = beta, y = term, xmin = beta - 1.96*se, xmax = beta + 1.96*se,
+                               label = sprintf("%0.2f", beta), color = ifelse(p < 0.05, "green", "blue"))) +
+  geom_point(size = 3) +
+  geom_errorbarh(height = 0.5, linewidth = 0.5) +
+  geom_vline(xintercept = 0, size = 0.5, linetype = "dashed") +
+  facet_wrap(~ model, scales = "free", ncol = 1) +
+  scale_color_identity() +
+  theme_minimal() +  # Use a minimal theme for cleaner look
+  scale_x_continuous(limits = c(-6, 0.5), breaks = seq(-6, 1, by = 1)) +
+  theme(axis.text.y = element_text(size = 10, hjust = 0),  # Rotate y-axis labels to horizontal
+        strip.text = element_text(size = 10),  # Increase strip text size
+        axis.text.x = element_text(size = 10),
+        axis.title = element_blank(),
+        legend.position = "none") +
+  labs(x = "Coefficient") +
+  guides(fill = guide_legend(title = "p < 0.05", override.aes = list(size = 3)))
+
+
+```
+```{r}
+summary(linear_regression_3A)
+summary(linear_regression_3B)
+summary(linear_regression_3C)
+```
+
+```{r}
+## FOREST PLOT FOR delta PHQ-9 ~ 2 PREDICTORS
+# Load required packages
+library(ggplot2)
+
+# Data for the forest plot
+coef_data1 <- data.frame(
+  Predictor = c("Retrospective Reports of Improvement", "Retrospective Reports of Treatment Helpfulness(Yes)"),
+  Estimate = c(-2.70, 1.37),
+  Std_Error = c(0.59, 1.13),
+  p = c(0,0.23 )
+)
+
+# Calculate 95% confidence intervals
+coef_data1$Lower_CI <- coef_data1$Estimate - 1.96 * coef_data1$Std_Error
+coef_data1$Upper_CI <- coef_data1$Estimate + 1.96 * coef_data1$Std_Error
+
+# Create the forest plot with APA7 formatting
+ggplot(coef_data1, aes(x = Estimate, y = Predictor)) +
+  geom_point(size = 3, color = ifelse(coef_data1$p < 0.05, "green", "blue")) +
+  geom_errorbarh(aes(xmin = Lower_CI, xmax = Upper_CI), height = 0, color = ifelse(coef_data1$p < 0.05, "green", "blue")) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(title = "OV = Delta PHQ-9",
+       x = "Coefficient Estimate with 95% CI",
+       y = NULL) +  # Remove y-axis label
+  theme_minimal() +
+  theme(axis.text.y = element_text(hjust = 0),
+        axis.text.x = element_text(size = 12),  # Adjust x-axis tick label size
+        axis.title = element_text(size = 12),  # Adjust axis title size and style
+        plot.title = element_text(size = 12, face = "bold"),  # Adjust plot title size and style
+        panel.grid.major.x = element_line(color = "gray80"),  # Add gray gridlines on x-axis
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines")) +  # Adjust plot margins
+  coord_cartesian(ylim = c(0.5, 2.5), xlim=c(-5,5))  # Set the y-axis limits to avoid extra white space
+
+
+
+```
+
+```{r}
+## FOREST PLOT FOR Delta GAD-7 ~ 2 PREDICTORS
+# Load required packages
+library(ggplot2)
+
+# Data for the forest plot
+coef_data2 <- data.frame(
+  Predictor = c("Retrospective Reports of Improvement", "Retrospective Reports of Treatment Helpfulness(Yes)"),
+  Estimate = c(-2.52, 0.48),
+  Std_Error = c(0.60, 1.16),
+  p = c(0,0.68)
+)
+
+# Calculate 95% confidence intervals
+coef_data2$Lower_CI <- coef_data2$Estimate - 1.96 * coef_data2$Std_Error
+coef_data2$Upper_CI <- coef_data2$Estimate + 1.96 * coef_data2$Std_Error
+
+# Create the forest plot with APA7 formatting
+ggplot(coef_data2, aes(x = Estimate, y = Predictor)) +
+  geom_point(size = 3, color = ifelse(coef_data2$p < 0.05, "green", "blue")) +
+  geom_errorbarh(aes(xmin = Lower_CI, xmax = Upper_CI), height = 0, color = ifelse(coef_data2$p < 0.05, "green", "blue")) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(title = "OV = Delta GAD-7",
+       x = "Coefficient Estimate with 95% CI",
+       y = NULL) +  # Remove y-axis label
+  theme_minimal() +
+  theme(axis.text.y = element_text(hjust = 0),
+        axis.text.x = element_text(size = 12),  # Adjust x-axis tick label size
+        axis.title = element_text(size = 12),  # Adjust axis title size and style
+        plot.title = element_text(size = 12, face = "bold"),  # Adjust plot title size and style
+        panel.grid.major.x = element_line(color = "gray80"),  # Add gray gridlines on x-axis
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines")) +  # Adjust plot margins
+  coord_cartesian(ylim = c(0.5, 2.5), xlim = c(-5,5))  # Set the y-axis limits to avoid extra white space
+
+```
+
+
+
+```{r}
+## FOREST PLOT FOR DELTA WSAS ~ 2 PREDICTORS
+# Data for the forest plot
+coef_data3 <- data.frame(
+  Predictor = c("Retrospective Reports of Improvement", "Retrospective Reports of Treatment Helpfulness(Yes)"),
+  Estimate = c(-3.34, 0.54),
+  Std_Error = c(0.76, 1.47),
+  p = c(0, 0.7)
+)
+
+# Calculate 95% confidence intervals
+coef_data3$Lower_CI <- coef_data3$Estimate - 1.96 * coef_data3$Std_Error
+coef_data3$Upper_CI <- coef_data3$Estimate + 1.96 * coef_data3$Std_Error
+
+# Create the forest plot with APA7 formatting and color coding
+plot3=ggplot(coef_data3, aes(x = Estimate, y = Predictor)) +
+  geom_point(size = 3, color = ifelse(coef_data3$p < 0.05, "green", "blue")) +
+  geom_errorbarh(aes(xmin = Lower_CI, xmax = Upper_CI), height = 0, color = ifelse(coef_data3$p < 0.05, "green", "blue")) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(title = "OV = Delta WSAS",
+       x = "Coefficient Estimate with 95% CI",
+       y = NULL) +  # Remove y-axis label
+  theme_minimal() +
+  theme(axis.text.y = element_text(hjust = 0),
+        axis.text.x = element_text(size = 12),  # Adjust x-axis tick label size
+        axis.title = element_text(size = 12),  # Adjust axis title size and style
+        plot.title = element_text(size = 12, face = "bold"),  # Adjust plot title size and style
+        panel.grid.major.x = element_line(color = "gray80"),  # Add gray gridlines on x-axis
+        panel.grid.minor = element_blank(),  # Remove minor gridlines
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines")) +  # Adjust plot margins
+  coord_cartesian(ylim = c(0.5,2.5), xlim=c(-5,5)) +  # Set the y-axis limits to avoid extra white space
+  scale_color_identity()  # Set the color scale based on the identity mapping
+plot3
+```
+## BOXPLOTS
+### Recovered
+```{r}
+# Calculate the mean for 'delta-gad7' column by each category
+library(dplyr)
+library
+port_preprocessed_data %>%
+  group_by(recovered) %>%
+  summarize(mean_value = mean(delta_gad7, na.rm = TRUE))
+
+
+```
+
+```{r}
+
+
+library(scales)
+library(ggplot2)
+boxplot_recovered_gad7 = ggplot(port_preprocessed_data, 
+       aes(x = factor(recovered,
+                      labels = c("No","Yes")), 
+           y = delta_gad7, 
+           color = recovered)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(title = "Δ GAD-7 for Recovered (Yes; No)", 
+       x = "Recovered",
+       y = "Δ GAD-7") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_recovered_gad7
+```
+
+```{r}
+
+library(scales)
+library(ggplot2)
+boxplot_recovered_phq9 = ggplot(port_preprocessed_data, 
+       aes(x = factor(recovered,
+                      labels = c("No","Yes")), 
+           y = delta_phq9, 
+           color = recovered)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(title = "Δ PHQ-9 for Recovered (Yes; No)", 
+       x = "Recovered",
+       y = "Δ PHQ-9") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_recovered_phq9
+```
+
+```{r}
+
+library(scales)
+library(ggplot2)
+boxplot_recovered_wsas = ggplot(port_preprocessed_data, 
+       aes(x = factor(recovered,
+                      labels = c("No","Yes")), 
+           y = delta_wsas, 
+           color = recovered)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(title = "Δ WSAS for Recovered (Yes; No)", 
+       x = "Recovered",
+       y = "Δ WSAS") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_recovered_wsas
+```
+
+
+```{r}
+library(patchwork)
+library(MASS)
+combined_boxplot_recovered <- boxplot_recovered_gad7 / boxplot_recovered_phq9 /boxplot_recovered_wsas
+combined_boxplot_recovered
+```
+
+### Reliable Improvement
+```{r}
+
+library(scales)
+library(ggplot2)
+boxplot_reliable_improvement_gad7 = ggplot(port_preprocessed_data, 
+       aes(x = factor(reliable_improvement,
+                      labels = c("No","Yes")), 
+           y = delta_gad7, 
+           color = reliable_improvement)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(title = "Δ GAD-7 for Reliable Improvement (Yes; No)", 
+       x = "Reliable Improvement",
+       y = "Δ GAD-7") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_reliable_improvement_gad7
+```
+
+```{r}
+
+library(scales)
+library(ggplot2)
+boxplot_reliable_improvement_phq9 = ggplot(port_preprocessed_data, 
+       aes(x = factor(reliable_improvement,
+                      labels = c("No","Yes")), 
+           y = delta_phq9, 
+           color = reliable_improvement)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(title = "Δ PHQ-9 for Reliable Improvement (Yes; No)", 
+       x = "Reliable Improvement",
+       y = "Δ PHQ-9") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_reliable_improvement_phq9
+```
+```{r}
+# plot the distribution of GAD-7 at follow-up 
+# by IAPT treatment outcomes using jittering
+library(scales)
+library(ggplot2)
+boxplot_reliable_improvement_wsas = ggplot(port_preprocessed_data, 
+       aes(x = factor(reliable_improvement,
+                      labels = c("No","Yes")), 
+           y = delta_wsas, 
+           color = reliable_improvement)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(title = "Δ WSAS for Reliable Improvement (Yes; No)", 
+       x = "Reliable Improvement",
+       y = "Δ WSAS") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_reliable_improvement_wsas
+```
+
+```{r}
+library(patchwork)
+library(MASS)
+combined <- (boxplot_recovered_gad7 + boxplot_recovered_phq9 +boxplot_recovered_wsas)/ (boxplot_reliable_improvement_gad7 + boxplot_reliable_improvement_phq9 + boxplot_reliable_improvement_wsas)
+combined
+```
+### Reliable Recovery
+```{r}
+
+library(scales)
+library(ggplot2)
+boxplot_reliable_recovery_gad7 = ggplot(port_preprocessed_data, 
+       aes(x = factor(reliable_recovery,
+                      labels = c("No","Yes")), 
+           y = delta_gad7, 
+           color = reliable_recovery)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(title = "Δ GAD-7 for Reliable Recovery (Yes; No)", 
+       x = "Reliable Recovery",
+       y = "Δ GAD-7") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_reliable_recovery_gad7
+```
+
+```{r}
+# phq9
+library(scales)
+library(ggplot2)
+boxplot_reliable_recovery_phq9 = ggplot(port_preprocessed_data, 
+       aes(x = factor(reliable_recovery,
+                      labels = c("No","Yes")), 
+           y = delta_phq9, 
+           color = reliable_recovery)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(title = "Δ PHQ-9 for Reliable Recovery (Yes; No)", 
+       x = "Reliable Recovery",
+       y = "Δ PHQ-9") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_reliable_recovery_phq9
+```
+
+```{r}
+#wsas
+
+library(scales)
+library(ggplot2)
+boxplot_reliable_recovery_wsas = ggplot(port_preprocessed_data, 
+       aes(x = factor(reliable_recovery,
+                      labels = c("No","Yes")), 
+           y = delta_wsas, 
+           color = reliable_recovery)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(title = "Δ WSAS for Reliable Recovery (Yes; No)", 
+       x = "Reliable Recovery",
+       y = "Δ WSAS") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_reliable_recovery_wsas
+```
+
+```{r}
+library(patchwork)
+library(MASS)
+combined_boxplots <- (boxplot_recovered_gad7 + boxplot_recovered_phq9 +boxplot_recovered_wsas)/ (boxplot_reliable_improvement_gad7 + boxplot_reliable_improvement_phq9 + boxplot_reliable_improvement_wsas) / (boxplot_reliable_recovery_gad7 + boxplot_reliable_recovery_phq9 + boxplot_reliable_recovery_wsas)
+combined_boxplots
+```
+
+
+```{r}
+#Computing a boxplot for the retrospectively treatment helpful variable and GAD-7 scores 
+
+boxplot_treatment_helpful_gad7 = ggplot(port_preprocessed_data, 
+       aes(x = factor(retrospectively_treatment_helpful,
+                      labels = c("No","Yes")), 
+           y = delta_gad7, 
+           color = retrospectively_treatment_helpful)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(
+       x = "Patient-rated Treatment Helpfulness",
+       y = "Δ GAD-7") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_treatment_helpful_gad7
+
+
+```
+
+```{r}
+#Computing a boxplot for the retrospectively treatment helpful variable and PHQ-9 scores 
+
+boxplot_treatment_helpful_phq9 = ggplot(port_preprocessed_data, 
+       aes(x = factor(retrospectively_treatment_helpful,
+                      labels = c("No","Yes")), 
+           y = delta_phq9, 
+           color = retrospectively_treatment_helpful)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(
+       x = "Patient-rated Treatment Helpfulness",
+       y = "Δ PHQ-9") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_treatment_helpful_phq9
+
+
+```
+
+```{r}
+#Computing a boxplot for the retrospectively treatment helpful variable and WSAS scores 
+
+boxplot_treatment_helpful_wsas = ggplot(port_preprocessed_data, 
+       aes(x = factor(retrospectively_treatment_helpful,
+                      labels = c("No","Yes")), 
+           y = delta_wsas, 
+           color = retrospectively_treatment_helpful)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs( 
+       x = "Patient-rated Treatment Helpfulness",
+       y = "Δ WSAS") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+boxplot_treatment_helpful_wsas
+
+
+```
+
+
+```{r}
+#Computing a boxplot for the retrospectively reported improvement variable and GAD-7 scores
+
+boxplot_retrospective_improvement_gad7 = ggplot(port_preprocessed_data, 
+       aes(x = factor(retrospectively_reported_improvement,
+           labels = c( "Much Worse","Little Worse","No Change", "Little Better", "Much Better")), 
+           y = delta_gad7, 
+           color = retrospectively_reported_improvement)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs( 
+       x = "Patient-rated Symptom Improvement",
+       y = "Δ GAD-7") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+  
+  
+
+boxplot_retrospective_improvement_gad7
+
+
+```
+
+```{r}
+#Computing a boxplot for the retrospectively reported improvement variable and PHQ-9 scores
+
+boxplot_retrospective_improvement_phq9 = ggplot(port_preprocessed_data, 
+       aes(x = factor(retrospectively_reported_improvement,
+           labels = c( "Much Worse","Little Worse","No Change", "Little Better", "Much Better")), 
+           y = delta_phq9, 
+           color = retrospectively_reported_improvement)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs( 
+       x = "Patient-rated Symptom Improvement",
+       y = "Δ PHQ-9") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+  
+  
+
+boxplot_retrospective_improvement_phq9
+
+
+```
+
+```{r}
+#Computing a boxplot for the retrospectively reported improvement variable and WSAS scores
+
+boxplot_retrospective_improvement_wsas = ggplot(port_preprocessed_data, 
+       aes(x = factor(retrospectively_reported_improvement,
+           labels = c( "Much Worse","Little Worse","No Change", "Little Better", "Much Better")), 
+           y = delta_phq9, 
+           color = retrospectively_reported_improvement)) +
+  geom_boxplot(size=1,
+               outlier.shape = 1,
+               outlier.color = "black",
+               outlier.size  = 3) +
+  geom_jitter(alpha = 0.5, 
+              width=.2) + 
+  scale_y_continuous() +
+  labs(
+       x = "Patient-reated Symptom Improvement",
+       y = "Δ WSAS") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+  
+  
+
+boxplot_retrospective_improvement_wsas
+
+
+```
+
+
+```{r}
+library(patchwork)
+library(MASS)
+combined_boxplots_retrospective_reports <- (boxplot_treatment_helpful_gad7 + boxplot_treatment_helpful_phq9 +boxplot_treatment_helpful_wsas)/ (boxplot_retrospective_improvement_gad7 + boxplot_retrospective_improvement_phq9 + boxplot_retrospective_improvement_wsas)
+
+combined_boxplots_retrospective_reports
+
+```
+
+
+
+
+
+

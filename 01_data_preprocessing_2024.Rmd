@@ -1,0 +1,407 @@
+---
+title: "01_data_preprocessing"
+author: "Caroline & Patrycja"
+date: "2023-09-05"
+output: html_document
+---
+
+
+# Preprocessing script
+
+```{r}
+#Clear the environment
+rm(list=ls())
+
+#Set working directory
+```
+
+# Initial operations on the dataset
+
+## call relevant libraries
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library (broom)
+library(moments) #package used to calculate the skewness of the data 
+
+```
+
+## load data into R environement
+
+```{r}
+# Loading the relevant data
+
+PORTdata <- readRDS("flare-kurf-port-data-2023.rds")
+
+
+
+#View the dataset to check that it has loaded as intended. 
+View(PORTdata)
+
+```
+
+## inspect variables/ column names
+
+```{r}
+
+colnames(PORTdata)
+
+```
+
+## filter for participants who had 2 or more CBT sessions
+
+```{r}
+
+my_data = PORTdata %>%
+  filter(ieso_treatment_completed_total>=2)
+# the dataset reduced from 292 to 150 participants
+
+```
+
+
+## see if the gad-7 assessment scores, wsas assessment scores and phq-9 assessment scores are there for each participant
+```{r}
+
+sum(is.na(my_data$phq9_assessment_total))
+
+# three PHQ-9 scores from assessment are missing
+
+```
+
+```{r}
+
+sum(is.na(my_data$gad7_assessment_total))
+
+# GAD-7 scores from assessment missing for two participants
+```
+```{r}
+
+sum(is.na(my_data$wsas_assessment_total))
+
+# wsas scores from assessment missing for 3 participants
+
+```
+
+## add columns: if assessment score missing - find first treatment score and use as the baseline for gad-7, phq-9, wsas
+
+## first gad-7 (assessment score or first treatment if assessment score missing)
+
+```{r}
+my_data = my_data %>%
+  mutate(first_gad7=coalesce(gad7_assessment_total, gad7_treatment_total_1,gad7_treatment_total_2,gad7_treatment_total_3,
+                                  gad7_treatment_total_4,gad7_treatment_total_5,gad7_treatment_total_6,
+                                       gad7_treatment_total_7,gad7_treatment_total_8,gad7_treatment_total_9,
+                                       gad7_treatment_total_10,gad7_treatment_total_11,gad7_treatment_total_12,
+                                       gad7_treatment_total_13,gad7_treatment_total_14,gad7_treatment_total_15))
+```
+
+## first phq-9 (assessment score or first treatment if assessment score missing)
+
+```{r}
+my_data = my_data %>%
+  mutate(first_phq9=coalesce(phq9_assessment_total, phq9_treatment_total_1,phq9_treatment_total_2,phq9_treatment_total_3,
+                                       phq9_treatment_total_4,phq9_treatment_total_5,phq9_treatment_total_6,
+                                       phq9_treatment_total_7,phq9_treatment_total_8,phq9_treatment_total_9,
+                                       phq9_treatment_total_10,phq9_treatment_total_11,phq9_treatment_total_12,
+                                       phq9_treatment_total_13,phq9_treatment_total_14,phq9_treatment_total_15))
+
+```
+
+## first wsas (assessment score or first treatment if assessment score missing)
+
+```{r}
+my_data = my_data %>%
+  mutate(first_wsas=coalesce(wsas_assessment_total, wsas_treatment_total_1,wsas_treatment_total_2,wsas_treatment_total_3,
+                                       wsas_treatment_total_4,wsas_treatment_total_5,wsas_treatment_total_6,
+                                       wsas_treatment_total_7,wsas_treatment_total_8,wsas_treatment_total_9,
+                                       wsas_treatment_total_10,wsas_treatment_total_11,wsas_treatment_total_12,
+                                       wsas_treatment_total_13,wsas_treatment_total_14,wsas_treatment_total_15))
+
+```
+
+## add column: last non-missing GAD-7 score from treatment sessions
+
+```{r}
+my_data = my_data %>%
+  mutate(last_treatment_gad7=coalesce(gad7_treatment_total_15,gad7_treatment_total_14,gad7_treatment_total_13,
+                                       gad7_treatment_total_12,gad7_treatment_total_11,gad7_treatment_total_10,
+                                       gad7_treatment_total_9,gad7_treatment_total_8,gad7_treatment_total_7,
+                                       gad7_treatment_total_6,gad7_treatment_total_5,gad7_treatment_total_4,
+                                       gad7_treatment_total_3,gad7_treatment_total_2,gad7_treatment_total_1))
+```
+
+
+## add column: last non-missing PHQ-9 score from treatment sessions
+
+```{r}
+my_data = my_data %>%
+  mutate(last_treatment_phq9=coalesce(phq9_treatment_total_15,phq9_treatment_total_14,phq9_treatment_total_13,
+                                      phq9_treatment_total_12,phq9_treatment_total_11,phq9_treatment_total_10,
+                                      phq9_treatment_total_9,phq9_treatment_total_8,phq9_treatment_total_7,
+                                      phq9_treatment_total_6,phq9_treatment_total_5,phq9_treatment_total_4,
+                                      phq9_treatment_total_3,phq9_treatment_total_2,phq9_treatment_total_1))
+
+```
+
+## add column: last non-missing WSAS score from treatment sessions
+
+```{r}
+my_data = my_data %>%
+  mutate(last_treatment_wsas=coalesce(wsas_treatment_total_15,wsas_treatment_total_14,wsas_treatment_total_13,
+                                      wsas_treatment_total_12,wsas_treatment_total_11,wsas_treatment_total_10,
+                                      wsas_treatment_total_9,wsas_treatment_total_8,wsas_treatment_total_7,
+                                      wsas_treatment_total_6,wsas_treatment_total_5,wsas_treatment_total_4,
+                                      wsas_treatment_total_3,wsas_treatment_total_2,wsas_treatment_total_1))
+
+```
+
+## add columns: delta_gad7, delta_phq9, delta_wsas
+
+These deltas are calculated by **subtracting** the **first recorded** score (assessment or first treatment) from the **last recorded score from treatment sessions**.
+
+```{r}
+
+my_data <- my_data %>%
+  mutate(delta_gad7=last_treatment_gad7 - first_gad7)
+
+my_data <- my_data %>%
+  mutate(delta_phq9=last_treatment_phq9 - first_phq9)
+
+my_data <- my_data %>%
+  mutate(delta_wsas=last_treatment_wsas - first_wsas)
+
+```
+
+## Are there any responses missing in the two variables that we will be useing as predictors: treatment_followup_symptoms_improve and treatment_followup_treatment_helpful?
+
+```{r}
+
+sum(is.na(my_data$treatment_followup_symptoms_improve)) # 13 entries missing in treatment_followup_symptoms_improve
+
+sum(is.na(my_data$treatment_followup_treatment_helpful)) # also 13 missing
+
+```
+## Remove rows with NA values in treatment_followup_symptoms_improve and treatment_followup_treatment_helpful
+
+```{r}
+
+my_data = my_data %>% drop_na(treatment_followup_symptoms_improve) #reduced from 150 to 137 participants
+
+my_data = my_data %>% drop_na(treatment_followup_treatment_helpful) #still 137 participants
+
+```
+
+## Add columns: retrospectively_reported_improvement and retrospectively_treatment_helpful to my_data
+
+```{r}
+
+# this variable will be treated as continuous
+my_data$retrospectively_reported_improvement <- with(my_data, 
+  ifelse(treatment_followup_symptoms_improve == "much_better", 4,
+         ifelse(treatment_followup_symptoms_improve == "little_better", 3,
+                ifelse(treatment_followup_symptoms_improve == "no_change", 2,
+                       ifelse(treatment_followup_symptoms_improve == "little_worse", 1, 0))
+               ))
+            )
+
+```
+
+```{r}
+
+my_data$retrospectively_treatment_helpful <- with(my_data, 
+  ifelse(treatment_followup_treatment_helpful == "yes", 1,
+         ifelse(treatment_followup_treatment_helpful == "no", 0, NA))
+)
+
+# Convert the column to a factor (categorical variable) 
+my_data$retrospectively_treatment_helpful<-as.factor(my_data$retrospectively_treatment_helpful)
+
+```
+
+## standardising the continuous covariates 
+
+```{r}
+
+my_data_standardised <- my_data %>% 
+  mutate_at(c('ieso_treatment_completed_total', 'demographics_age_at_screening_years'), scale)
+
+
+
+#check
+mean(my_data_standardised$ieso_treatment_completed_total)
+sd(my_data_standardised$ieso_treatment_completed_total)
+hist(my_data_standardised$ieso_treatment_completed_total)
+  
+```
+
+## Checking the skewness of variables
+
+```{r}
+
+#calculate skewness of the relevant variables
+
+skewness(my_data$delta_gad7, na.rm =T) #-0.18
+skewness(my_data$demographics_age_at_screening) #-0.49
+skewness(my_data$delta_phq9) #-0.40
+skewness(my_data$ieso_treatment_completed_total) #0.65
+skewness(my_data$delta_wsas) #NA
+
+```
+
+## Checking the distribution of delta_wsas
+
+```{r}
+
+hist(my_data$delta_wsas) #normally distributed
+
+```
+
+## IAPT treatment outcomes:
+IAPT treatment outcomes definitions:
+
+A person is considered **recovered** if their scores on the depression and/or anxiety are above the clinical cut-off on either at the start of treatment, and their scores on both are below the clinical cut-off at the end of treatment.
+
+**Reliable improvement** is recognized when a person shows a significant improvement (based on the measurement error of each scale) after a course of treatment, which is measured by the difference between their first and last score. Patient can only be categorised as showing "reliable improvement" if there was a score reduction in one of the measurements and they did not worsen on the other measure. For instance, GAD-7 score decreased but there was no change in PHQ-9. On the other hand, if the patient showed reliable reduction in GAD-7 but simultaneously an increase in PHQ-9 - their outcome would not be thought of as "reliable improvement".
+
+**reliable recovery** occurs when an individual meets the criteria for both "recovery" and "reliable improvement".
+
+**no change or deterioration** group, which will consist of participants who did not fall into any of the above groups.
+
+
+```{r}
+# create column for recovered
+
+my_data_standardised <- my_data_standardised  %>% 
+  mutate(recovered =
+                     case_when((first_gad7 >= 8 | first_phq9 >=10) & (last_treatment_gad7 < 8 & last_treatment_phq9 < 10) ~ "yes"))
+
+#replace NAs in recovered with "no"
+my_data_standardised$recovered <- my_data_standardised$recovered %>% replace_na('no')
+my_data_standardised %>%
+ count(recovered)
+```
+
+```{r}
+# create column for reliable improvement
+
+my_data_standardised <- my_data_standardised  %>% 
+  mutate(reliable_improvement =
+                     case_when((delta_gad7<= -4 & delta_phq9 <= -6) | (delta_gad7<= -4 & delta_phq9 > -6 & delta_phq9 <= 6) | (delta_gad7 > -4 & delta_gad7 <= 4 & delta_phq9 <= -6) ~ "yes"))
+
+#replace NAs in reliable_improvement with "no"
+my_data_standardised$reliable_improvement <- my_data_standardised$reliable_improvement %>% replace_na('no')
+my_data_standardised %>%
+ count(reliable_improvement)
+
+
+View(my_data)
+```
+
+```{r}
+# create column for reliable recovery:
+my_data_standardised <- my_data_standardised  %>% 
+  mutate(reliable_recovery = case_when(((first_gad7 >= 8 | first_phq9 >=10) & (last_treatment_gad7 < 8 & last_treatment_phq9 < 10)) & ((delta_gad7<= -4 & delta_phq9 <= -6) | (delta_gad7<= -4 & delta_phq9 > -6 & delta_phq9 <= 6) | (delta_gad7 > -4 & delta_gad7 <= 4 & delta_phq9 <= -6)) ~ "yes"))
+
+#replace NAs in reliable_recovery with "no"
+my_data_standardised$reliable_recovery <- my_data_standardised$reliable_recovery %>% replace_na('no')
+my_data_standardised %>%
+ count(reliable_recovery)
+```
+
+```{r}
+
+# create column for reliable recovery2:
+my_data_standardised <- my_data_standardised %>% 
+  mutate(reliable_recovery2 = case_when(
+    recovered == 'yes' & reliable_improvement == 'yes' ~ 'yes',
+    TRUE ~ 'no'
+  ))
+# Are columns reliable recovery and reliable recovery 2 equal
+are_columns_equal <- identical(my_data_standardised$reliable_recovery, my_data_standardised$reliable_recovery2)
+
+# 'are_columns_equal' will be TRUE if the two columns are exactly the same, otherwise, it will be FALSE.
+# not equal
+
+table(my_data_standardised$reliable_recovery)
+table(my_data_standardised$reliable_recovery2)
+```
+
+
+```{r}
+# Remove participant number 48, as we noticed that he had some missing data for the variables necessary for planned analyses. 
+#Removing them using their participant_id in case there are any later changed to the paricipants, which change the row in which he is. 
+
+# Their participant_id is "2yd3UILFboqN5oE"
+
+# Creating a new dataset excluding the participant with participant_id "2yd3UILFboqN5oE"
+my_data_standardised <- subset(my_data_standardised, participant_id != "2yd3UILFboqN5oE")
+my_data <- subset(my_data, participant_id != "2yd3UILFboqN5oE")
+
+# View the new dataset
+View(my_data_standardised)
+
+
+```
+
+```{r}
+## add unstandardised number of treatments completed and age to the dataframe
+
+my_data_standardised$no_treatments_completed <- my_data$ieso_treatment_completed_total
+my_data_standardised$age <-my_data$demographics_age_at_screening
+
+```
+
+
+## FURTHER EXCLUSION CRITERIA
+
+```{r}
+## Adding additional exclusion criteria proposed by Tom and Meg
+
+#Starting by subsetting the data into a new dataset
+old_data = my_data_standardised
+
+my_data_standardised = my_data_standardised %>%
+  filter(port_screening_eligibility == TRUE) %>% #means they passed screening
+  filter(ieso_exclusion_port == FALSE)
+
+#total number of participants equal to 135
+
+colnames(my_data_standardised)
+
+```
+
+```{r}
+# Add NAs such that the dataset fits our definition of  recovery: “Yes” for individuals who were above the clinical cut-off for either or both of the GAD-7 (≥ 8) and PHQ-9 (≥ 10) at baseline and at the end of treatment scored below the cut-off for BOTH GAD-7 and PHQ-9. Otherwise, “no”.  If patients did not score above either symptom measure at baseline, they are scored as missing for this outcome.
+
+my_data_standardised <- my_data_standardised %>%
+  mutate(
+    recovered = ifelse(first_gad7 >= 8 | first_phq9 >= 10, recovered, NA),
+    reliable_recovery = ifelse(first_gad7 >= 8 | first_phq9 >= 10, reliable_recovery, NA)
+  )
+
+View(my_data_standardised)
+
+```
+
+
+```{r}
+
+#change demographics_gender into a numeric variable 
+#(non_binary -> 0, male -> 1, female -> 2)my_data_standardised <- my_data_standardised %>%
+  mutate(demographics_gender = ifelse(demographics_gender == "female", 2,
+                                      ifelse(demographics_gender == "male", 1, 0)))
+
+```
+
+
+```{r}
+#Create a new file with the preprocessed_port_dataset 
+
+saveRDS(my_data_standardised, file = "02_preprocessed_port_data.rds")
+
+```
+
+
+
+

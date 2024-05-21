@@ -1,0 +1,371 @@
+---
+title: "02_descriptive_statistics"
+author: "Caroline & Patrycja"
+date: "2023-09-05"
+output: html_document
+---
+
+
+```{r}
+#Clear the environment
+rm(list = ls()) 
+
+#Set working directory
+
+```
+
+
+```{r}
+#Loading relevant packages
+
+library(tidyverse)
+library(dplyr)
+library(psych) #To compute summary of descriptive statistics
+library(effectsize) #For computing the effect sizes of the t-tests
+
+```
+
+
+```{r}
+
+#Load the dataset into an object
+#This line of code works to load the port data
+port_preprocessed_data <- readRDS("flare-kurf-port-data-2023.rds")
+
+#Checking that it works, and loaded the data correctly
+view(port_preprocessed_data)
+
+```
+
+
+```{r}
+
+#Computing the descriptive statistics for the linear regressions.
+
+#Creating a new dataframe with only the relevant variables for the descriptive statistics for the linear regresssion. 
+# For reference, this include the means (standard deviations) of the PHQ-9, GAD-7, and WSAS, for the first and last treatment sessions, as well as the change in scores, for each category. 
+
+linear_regression_variables <- port_preprocessed_data[c("reliable_recovery", "reliable_improvement", "recovered", 
+                               "delta_wsas", "delta_phq9", "delta_gad7", 
+                               "last_treatment_wsas", "first_wsas", 
+                               "last_treatment_phq9", "first_phq9", 
+                               "last_treatment_gad7", "first_gad7")]
+
+# View the new dataset
+View(linear_regression_variables)
+```
+
+
+```{r}
+
+### For the recovered category
+
+# Subset the data to include only those participants who answered 'yes'
+recovered_yes <- linear_regression_variables[linear_regression_variables$recovered == "yes", ]
+
+# Use the descriptives function from the psych package on the subsetted data to obtain table with descriptives
+describe(recovered_yes)
+
+
+# Subset the data to include only those participants who answered 'no'
+recovered_no <- linear_regression_variables[linear_regression_variables$recovered == "no", ]
+
+# Use the descriptives function from the psych package on the subsetted data to obtain table with descriptives
+describe(recovered_no)
+
+```
+
+```{r}
+
+### For the reliable improvement category
+
+# Subset the data to include only those participants who answered 'yes'
+reliable_improvement_yes <- linear_regression_variables[linear_regression_variables$reliable_improvement == "yes", ]
+
+# Use the descriptives function from the psych package on the subsetted data to obtain table with descriptives
+describe(reliable_improvement_yes)
+
+
+# Subset the data to include only those participants who answered 'no'
+reliable_improvement_no <- linear_regression_variables[linear_regression_variables$reliable_improvement == "no", ]
+
+# Use the descriptives function from the psych package on the subsetted data to obtain table with descriptives
+describe(reliable_improvement_no)
+
+
+```
+
+```{r}
+
+### For the reliable recovery category
+
+# Subset the data to include only those participants who answered 'yes'
+reliable_recovery_yes <- linear_regression_variables[linear_regression_variables$reliable_recovery == "yes", ]
+
+# Use the descriptives function from the psych package on the subsetted data to obtain table with descriptives
+describe(reliable_recovery_yes)
+
+
+# Subset the data to include only those participants who answered 'no'
+reliable_recovery_no <- linear_regression_variables[linear_regression_variables$reliable_recovery == "no", ]
+
+# Use the descriptives function from the psych package on the subsetted data to obtain table with descriptives
+describe(reliable_recovery_no)
+
+
+```
+
+
+```{r}
+
+#Computing the descriptive statistics for the participants, including their age, gender, etc. distributions. 
+#Viewing the variables to see which ones are necessary for the descriptives.
+
+colnames(port_preprocessed_data)
+
+#The ones necessary are "demographics_age_at_screening_years", "no_treatments_completed", "ieso_diagnosis_name", "demographics_gender", "demographics_employment"
+
+#Creating a new dataframe with those variables.
+descriptives_variables <- port_preprocessed_data[c("demographics_age_at_screening_years", "no_treatments_completed", 
+                                                   "ieso_diagnosis_name", 
+                                                   "demographics_gender", 
+                                                   "demographics_employment")]
+
+#Checking it was implemented as intended
+View(descriptives_variables)
+
+#Descriptives age and n treatments
+
+describe(descriptives_variables)
+
+# Computing a frequency distribution for the different diagnoses
+table(descriptives_variables$ieso_diagnosis_name)
+
+# The majority of the participants were diagnosed with either generalised anxiety disorder (44.4%) or a depressive episode (28.8%). 
+
+# Computing a frequency distribution for the different gender categories
+table(descriptives_variables$demographics_gender)
+
+
+# Computing a frequency distribution for the different types of employment status. 
+table(descriptives_variables$demographics_employment)
+
+```
+
+```{r}
+
+linear_regression_variables <- port_preprocessed_data[c("reliable_recovery", "reliable_improvement", "recovered", 
+                               "delta_wsas", "delta_phq9", "delta_gad7", 
+                               "last_treatment_wsas", "first_wsas", 
+                               "last_treatment_phq9", "first_phq9", 
+                               "last_treatment_gad7", "first_gad7")]
+```
+
+
+```{r}
+
+#Using indexing to select the correct participants from the broader datasample, such that I can double check the ~1 week estimate between the day where they completed the baseline assessment and the day they started treatment. 
+
+#Loading the initial / archived dataset
+archived_dataset <- readRDS("~/Library/CloudStorage/OneDrive-King'sCollegeLondon/KURF/Data Analysis/Data/flare-undergrad-port-data-2023.rds")
+
+#Loading final PORT KURF dataset
+final_dataset <- readRDS("~/Library/CloudStorage/OneDrive-King'sCollegeLondon/KURF/Data Analysis/Data/02_preprocessed_port_data.rds")
+
+final_participants_archived_dataset <- archived_dataset[archived_dataset$participant_id %in% final_dataset$participant_id, ]
+
+
+# Checking if all participant_id values in final_participants_archived_dataset are present in final_dataset
+all_ids_present <- all(final_participants_archived_dataset$participant_id %in% final_dataset$participant_id)
+
+# Checking if all participant_id values in final_dataset are present in final_participants_archived_dataset
+all_ids_present_in_archived <- all(final_dataset$participant_id %in% final_participants_archived_dataset$participant_id)
+
+# Computing final check using an ifelse argument 
+if (all_ids_present && all_ids_present_in_archived) {
+  print("YES.")
+} else {
+  print("NO.")
+}
+
+#Response is YES, indicating that the selection of participants was implemented as intended. 
+
+
+```
+
+
+```{r}
+# Computing the average time between the ieso_assessment_date, and the ieso_first_treatment_date
+
+#Checking the type of variable that the relevant columns are in 
+class(final_participants_archived_dataset$ieso_assessment_date)
+class(final_participants_archived_dataset$ieso_first_treatment_date)
+
+#They are already in a date format, however, I need them to be in a different type of date format for the function that I am about to use. Therefore, I am converting them to Date objects. 
+final_participants_archived_dataset$ieso_assessment_date <- as.Date(final_participants_archived_dataset$ieso_assessment_date)
+
+final_participants_archived_dataset$ieso_first_treatment_date <- as.Date(final_participants_archived_dataset$ieso_first_treatment_date)
+
+#Checking this was implemented as intended
+class(final_participants_archived_dataset$ieso_assessment_date)
+class(final_participants_archived_dataset$ieso_first_treatment_date)
+
+# Calculate the time difference
+time_difference <- difftime(final_participants_archived_dataset$ieso_first_treatment_date, final_participants_archived_dataset$ieso_assessment_date, units = "days")
+
+
+# Calculate the average time difference
+mean_time_difference <- mean(time_difference, na.rm = TRUE)
+
+sd_time_difference <- sd(time_difference, na.rm = TRUE)
+
+# Print the average time difference
+print(mean_time_difference)
+print(sd_time_difference)
+
+
+#The mean (sd) number of days between the two assessments is 12.2 (9.2) days. 
+
+
+```
+
+```{r}
+#Computing independent samples t-tests to check whether the differences in symptom severity are significantly different for the yes and no groups in each 
+
+#GAD-7
+
+t.test(port_preprocessed_data$delta_gad7 ~ port_preprocessed_data$recovered, var.equal = TRUE)
+
+cohens_d(delta_gad7 ~ recovered, data = port_preprocessed_data)
+
+t.test(port_preprocessed_data$delta_gad7 ~ port_preprocessed_data$reliable_improvement, var.equal = TRUE)
+
+cohens_d(delta_gad7 ~ reliable_improvement, data = port_preprocessed_data)
+
+t.test(port_preprocessed_data$delta_gad7 ~ port_preprocessed_data$reliable_recovery, var.equal = TRUE)
+
+cohens_d(delta_gad7 ~ reliable_recovery, data = port_preprocessed_data)
+
+
+```
+
+
+```{r}
+#Computing independent samples t-tests to check whether the differences in symptom severity are significantly different for the yes and no groups in each 
+
+#PHQ-9
+
+t.test(port_preprocessed_data$delta_phq9 ~ port_preprocessed_data$recovered, var.equal = TRUE)
+
+cohens_d(delta_phq9 ~ recovered, data = port_preprocessed_data)
+
+
+t.test(port_preprocessed_data$delta_phq9 ~ port_preprocessed_data$reliable_improvement, var.equal = TRUE)
+
+cohens_d(delta_phq9 ~ reliable_improvement, data = port_preprocessed_data)
+
+
+t.test(port_preprocessed_data$delta_phq9 ~ port_preprocessed_data$reliable_recovery, var.equal = TRUE)
+
+cohens_d(delta_phq9 ~ reliable_recovery, data = port_preprocessed_data)
+
+
+```
+
+```{r}
+#Computing independent samples t-tests to check whether the differences in symptom severity are significantly different for the yes and no groups in each 
+
+#WSAS
+t.test(port_preprocessed_data$delta_wsas ~ port_preprocessed_data$recovered, var.equal = TRUE)
+
+cohens_d(delta_wsas ~ recovered, data = port_preprocessed_data)
+
+
+t.test(port_preprocessed_data$delta_wsas ~ port_preprocessed_data$reliable_improvement, var.equal = TRUE)
+
+cohens_d(delta_wsas ~ reliable_improvement, data = port_preprocessed_data)
+
+
+t.test(port_preprocessed_data$delta_wsas ~ port_preprocessed_data$reliable_recovery, var.equal = TRUE)
+
+cohens_d(delta_wsas ~ reliable_recovery, data = port_preprocessed_data)
+
+
+```
+
+
+```{r}
+
+####This section was added after recieving additional variables to add further detail to the paper's manuscript
+
+# Set working directory & Import data 
+
+#Checking data were loaded as intended 
+View(additional_kurf_variables)
+
+```
+
+```{r}
+
+# Calculating the mean(SD) number of days betweeen assessment and the first treatment session
+mean_difference_assessment_first_treatment <- mean(as.numeric(additional_kurf_variables$ieso_assessment_date - additional_kurf_variables$ieso_first_treatment_date), na.rm = TRUE)
+
+sd_difference_assessment_first_treatment <- sd(as.numeric(additional_kurf_variables$ieso_assessment_date - additional_kurf_variables$ieso_first_treatment_date), na.rm = TRUE)
+
+# Printing the mean difference
+print(mean_difference_assessment_first_treatment)
+print(sd_difference_assessment_first_treatment)
+
+##The difference is 12.19 (9.20) days 
+
+```
+
+
+```{r}
+
+# Calculating the mean(SD) number of days betweeen the follow-up assessment and the last treatment session
+mean_difference_followup_last_treatment <- mean(as.numeric(additional_kurf_variables$ieso_last_treatment_date - additional_kurf_variables$followup_date), na.rm = TRUE)
+
+sd_difference_followup_last_treatment <- sd(as.numeric(additional_kurf_variables$ieso_last_treatment_date - additional_kurf_variables$followup_date), na.rm = TRUE)
+
+# Printing the mean difference
+print(mean_difference_followup_last_treatment)
+print(sd_difference_followup_last_treatment)
+
+##The difference is 44.07 (21.23) days 
+
+```
+
+```{r}
+
+# Computing additional descriptive statistics on participant demographics
+
+## Biological sex
+frequency_participant_biological_sex <- table(additional_kurf_variables$demographics_biological_sex)
+
+print(frequency_participant_biological_sex)
+
+
+
+## Gender
+frequency_participant_gender <- table(additional_kurf_variables$demographics_gender)
+
+print(frequency_participant_gender)
+
+
+
+##Ethnic origin 
+frequency_participant_ethnic_origin <- table(additional_kurf_variables$demographics_ethnic_origin)
+
+print(frequency_participant_ethnic_origin)
+
+
+
+## Employment 
+frequency_participant_employment <- table(additional_kurf_variables$demographics_employment)
+
+print(frequency_participant_employment)
+
+
+```
+
