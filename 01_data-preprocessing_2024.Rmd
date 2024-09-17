@@ -329,14 +329,14 @@ table(my_data_standardised$reliable_recovery2)
 
 
 ```{r}
-# Remove participant number [masked for anonymity], as we noticed that he had some missing data for the variables necessary for planned analyses. 
+# Remove participant number 48, as we noticed that he had some missing data for the variables necessary for planned analyses. 
 #Removing them using their participant_id in case there are any later changed to the paricipants, which change the row in which he is. 
 
-# Their participant_id is "masked_for_anonymity"
+# Their participant_id is "2yd3UILFboqN5oE"
 
-# Creating a new dataset excluding the participant with participant_id "masked_for_anonymity"
-my_data_standardised <- subset(my_data_standardised, participant_id != "masked_for_anonymity")
-my_data <- subset(my_data, participant_id != "masked_for_anonymity")
+# Creating a new dataset excluding the participant with participant_id "2yd3UILFboqN5oE"
+my_data_standardised <- subset(my_data_standardised, participant_id != "2yd3UILFboqN5oE")
+my_data <- subset(my_data, participant_id != "2yd3UILFboqN5oE")
 
 # View the new dataset
 View(my_data_standardised)

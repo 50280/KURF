@@ -22,6 +22,9 @@ library(tidyverse)
 library(dplyr)
 library(psych) #To compute summary of descriptive statistics
 library(effectsize) #For computing the effect sizes of the t-tests
+library(ggplot2) #For the last plot
+library(tidyr) #For the last plot
+
 
 ```
 
@@ -167,10 +170,10 @@ linear_regression_variables <- port_preprocessed_data[c("reliable_recovery", "re
 #Using indexing to select the correct participants from the broader datasample, such that I can double check the ~1 week estimate between the day where they completed the baseline assessment and the day they started treatment. 
 
 #Loading the initial / archived dataset
-archived_dataset <- readRDS("flare-undergrad-port-data-2023.rds")
+archived_dataset <- readRDS("~/Library/CloudStorage/OneDrive-King'sCollegeLondon/KURF/Data Analysis/Data/flare-undergrad-port-data-2023.rds")
 
 #Loading final PORT KURF dataset
-final_dataset <- readRDS("02_preprocessed_port_data.rds")
+final_dataset <- readRDS("~/Library/CloudStorage/OneDrive-King'sCollegeLondon/KURF/Data Analysis/Data/02_preprocessed_port_data.rds")
 
 final_participants_archived_dataset <- archived_dataset[archived_dataset$participant_id %in% final_dataset$participant_id, ]
 
@@ -366,6 +369,112 @@ frequency_participant_employment <- table(additional_kurf_variables$demographics
 
 print(frequency_participant_employment)
 
+
+```
+
+```{r}
+#Creating a bar plot to visualise the association between the change scores and the mean levels of improvement 
+
+#Starting by creating a dataframe with the information of the factors to be visualised
+
+improvement_0 <- filter(port_preprocessed_data, retrospectively_reported_improvement == 0) #total of 2 patients
+improvement_1 <- filter(port_preprocessed_data, retrospectively_reported_improvement == 1) #total of 3 patients
+improvement_2 <- filter(port_preprocessed_data, retrospectively_reported_improvement == 2) #total of 34 patients
+improvement_3 <- filter(port_preprocessed_data, retrospectively_reported_improvement == 3) #total of 62 patients
+improvement_4 <- filter(port_preprocessed_data, retrospectively_reported_improvement == 4) #total of 34 patients
+#Overall 135 patients in the different categories, so everyone is included
+```
+
+
+
+```{r}
+bar_data <- port_preprocessed_data %>%
+  group_by(retrospectively_reported_improvement) %>%
+  summarise(mean_gad7 = mean(delta_gad7), 
+            mean_phq9 = mean(delta_phq9),
+            mean_wsas = mean(delta_wsas),
+            sd_gad7 = sd(delta_gad7),
+            sd_phq9 = sd(delta_phq9),
+            sd_wsas = sd(delta_wsas))
+
+# Reshape data to long format for means
+long_means <- bar_data %>%
+  pivot_longer(cols = starts_with("mean_"), 
+               names_to = "change_score_type_mean", 
+               names_prefix = "mean_", 
+               values_to = "mean")
+
+# Reshape data to long format for standard deviations
+long_sds <- bar_data %>%
+  pivot_longer(cols = starts_with("sd_"), 
+               names_to = "change_score_type_sd", 
+               names_prefix = "sd_", 
+               values_to = "sd")
+
+# Combine means and standard deviations into a single dataset
+long_bar_data_step2 <- long_means %>%
+  left_join(long_sds, by = c("retrospectively_reported_improvement", "change_score_type_mean" = "change_score_type_sd"))
+
+# Modify axis labels by creating a named vector
+improvement_levels <- c("Much Worse" = 0, "Little Worse" = 1, "No Change" = 2, "Little Better" = 3, "Much Better" = 4)
+
+# Ensure the x-axis variable is a factor with levels
+long_bar_data_step2 <- long_bar_data_step2 %>%
+  mutate(retrospectively_reported_improvement = factor(retrospectively_reported_improvement, 
+                                                        levels = improvement_levels))
+
+# Plotting
+long_bar_data_step2 %>%
+  ggplot(aes(x = retrospectively_reported_improvement, 
+             y = mean, 
+             fill = change_score_type_mean)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = mean - sd, 
+                    ymax = mean + sd), 
+                position = position_dodge(width = 0.8), 
+                width = 0.2, 
+                size = 0.5, 
+                color = "darkgrey") +
+  scale_x_discrete(labels = names(improvement_levels)) +  # Use named vector for labels
+  scale_fill_manual(values = c("gad7" = "#117733", 
+                               "phq9" = "#88CCEE", 
+                               "wsas" = "#882255")) +
+  theme_minimal() +
+  labs(title = "Retrospectively Reported Improvement by Different Change Scores", 
+       x = "Retrospective Improvement",
+       y = "Mean Change in Clinical Questionnaire Scores", 
+       fill = "Clinical Questionnaire Name") +
+  theme(panel.spacing = unit(1, "points"),
+        panel.border = element_blank(),
+        axis.line = element_line(),
+        legend.text = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 12),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        legend.position = "right",
+        plot.title = element_text(hjust = 0.5))
+
+```
+
+
+```{r}
+##Computing the correlations between helpfulness and improvement
+
+#Converting the helpfulness column to a numeric value
+class(port_preprocessed_data$retrospectively_treatment_helpful)
+
+port_preprocessed_data$retrospectively_treatment_helpful <- as.numeric(as.character(port_preprocessed_data$retrospectively_treatment_helpful))
+
+corr_improvement_helpfulness <- cor.test(port_preprocessed_data$retrospectively_reported_improvement, port_preprocessed_data$retrospectively_treatment_helpful, method = "pearson")
+
+print(corr_improvement_helpfulness)
+
+corr_gad7_phq9_first <- cor.test(port_preprocessed_data$first_gad7, port_preprocessed_data$first_phq9, method = "pearson")
+
+corr_gad7_phq9_last <- cor.test(port_preprocessed_data$last_treatment_gad7, port_preprocessed_data$last_treatment_phq9, method = "pearson")
+
+print(corr_gad7_phq9_last)
 
 ```
 

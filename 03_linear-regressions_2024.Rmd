@@ -51,7 +51,6 @@ port_preprocessed_data <- port_preprocessed_data %>%
 ```{r}
 
 #change demographics_gender into a numeric variable 
-(non_binary -> 0, male -> 1, female -> 2)
 port_preprocessed_data <- port_preprocessed_data %>%
   mutate(demographics_gender = ifelse(demographics_gender == "female", 2,
                                       ifelse(demographics_gender == "male", 1, 0)))
@@ -242,15 +241,16 @@ shapiro.test(linear_regression_3A$residuals)
 shapiro.test(linear_regression_3B$residuals)
 shapiro.test(linear_regression_3C$residuals)
 
+# However, the p-values obtained by conducting a Shapiro test were significant in the following models 1A, 2A, and 3A. Based on the results from the Shapiro Wilk test, this suggests that the assumption of the normality of residuals is violated in the delta PHQ-9 variable. 
 
 ```
-
 
 ```{r}
 
 #Testing whether the regression models are significantly different from one another. This will be done by (1) plotting them on the same graph to visually assess their differences and (2) comparing whether they have comparable levels of significance and effect sizes. 
 
 ```
+
 
 ```{r}
 #Checking assumption (3) homogeneity of variance 
@@ -346,7 +346,7 @@ corr.test(linear_regression_data, adjust = "none")
 
 corPlot(linear_regression_data, diag = F, zlim = c(.0,1), upper = F, numbers = TRUE, cex.axis =.5)
 
-#The correlations between delta GAD-7. PHQ-9 and WSAS are relatively high in their magnitude, however this may be expected given the high co-morbidity between the constructs assessed by these variables. 
+#The correlations between delta GAD-7. PHQ-9 and WSAS are relatively high in their magnitude, however this may be expected given the high co-morbidity between these constructs assessed by these variables. 
 
 ```
 
@@ -444,7 +444,7 @@ print(plot)
 
 
 ```{r}
-# Sample data (replace with your actual data)
+
 data <- data.frame(
   helpfulness = as.numeric(as.character(port_preprocessed_data$retrospectively_treatment_helpful)),
   delta_gad7 = port_preprocessed_data$delta_gad7,
@@ -536,6 +536,94 @@ plot <- ggplot(cor_df, aes(x = Variable, y = Correlation)) +
 
 # Add text labels with rounded correlation values
 plot + geom_text(aes(label = sprintf("%.2f", Correlation)), vjust = -0.5, size = 3)
+
+```
+
+```{r}
+
+##Computing the linear regressions again without the covariates of number of treatment sessions, gender, and age following a reviewer comment
+##PART 1
+
+# 1 = Retrospective symptom improvement
+# 2 = Retrospective treatment helpfulness
+# 3 = 1 & 2 combined
+
+# A = Delta PHQ-9
+# B = Delta GAD-7
+# C = Delta WSAS
+
+#Computing linear regression 1A using retrospective symptom improvement as a predictor variable, and delta PHQ-9 as an outcome variable. 
+
+linear_regression_1A_B <- lm(delta_phq9 ~ retrospectively_reported_improvement, port_preprocessed_data)
+
+summary(linear_regression_1A_B)
+
+#Computing linear regression 1B using retrospective symptom improvement as a predictor variable, and delta GAD-7 outcome variable. 
+
+linear_regression_1B_B <- lm(delta_gad7 ~ retrospectively_reported_improvement, port_preprocessed_data)
+
+summary(linear_regression_1B_B)
+
+#Computing linear regression 1C using retrospective symptom improvement as a predictor variable, and delta WSAS as an outcome variable. 
+
+linear_regression_1C_B <- lm(delta_wsas ~ retrospectively_reported_improvement, port_preprocessed_data)
+
+summary(linear_regression_1C_B)
+
+
+```
+
+```{r}
+##Computing the linear regressions again without the covariates of number of treatment sessions, gender, and age following a reviewer comment
+##PART 2
+
+#Computing linear regression 2A using retrospective treatment helpfulness as a predictor variable, and delta PHQ-9 as an outcome variable. 
+
+linear_regression_2A_B <- lm(delta_phq9 ~ retrospectively_treatment_helpful, port_preprocessed_data)
+
+summary(linear_regression_2A_B)
+
+
+#Computing linear regression 2B using retrospective treatment helpfulness as a predictor variable, and recovered as an outcome variable. 
+
+linear_regression_2B_B <- lm(delta_gad7 ~ retrospectively_treatment_helpful, port_preprocessed_data)
+
+summary(linear_regression_2B_B)
+
+
+#Computing linear regression 2C using retrospective treatment helpfulness as a predictor variable, and reliable recovery as an outcome variable. 
+
+linear_regression_2C_B <- lm(delta_wsas ~ retrospectively_treatment_helpful, port_preprocessed_data)
+
+summary(linear_regression_2C_B)
+
+
+```
+
+
+```{r}
+##Computing the linear regressions again without the covariates of number of treatment sessions, gender, and age following a reviewer comment
+##PART 3
+
+#Computing linear regression 3A using retrospective treatment helpfulness as a predictor variable, and delta PHQ-9 as an outcome variable. 
+
+linear_regression_3A_B <- lm(delta_phq9 ~ retrospectively_reported_improvement + retrospectively_treatment_helpful, port_preprocessed_data)
+
+summary(linear_regression_3A_B)
+
+
+#Computing linear regression 3B using retrospective treatment helpfulness as a predictor variable, and delta GAD-7 as an outcome variable. 
+
+linear_regression_3B_B <- lm(delta_gad7 ~ retrospectively_reported_improvement + retrospectively_treatment_helpful, port_preprocessed_data)
+
+summary(linear_regression_3B_B)
+
+
+#Computing linear regression 3C using retrospective treatment helpfulness as a predictor variable, and delta WSAS as an outcome variable. 
+
+linear_regression_3C_B <- lm(delta_wsas ~ retrospectively_reported_improvement + retrospectively_treatment_helpful, port_preprocessed_data)
+
+summary(linear_regression_3C_B)
 
 ```
 
