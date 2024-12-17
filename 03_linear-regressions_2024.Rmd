@@ -25,8 +25,8 @@ library(MASS) # to conduct the box-cox transformation of the delta phq9 variable
 library(car) # to ckeck assumption (5) of multicollinearity by computing the Variance Inflation Factor. 
 library(psych) # to compute the correlation matrix and further check the assumption (5) of multicollinearity. 
 library(ggplot2) # to visualise the linear regressions
-
-
+library(lme4) # for mixed models
+library(Matrix) # lme4 requires this package for the analyses conducted.
 ```
 
 ```{r}
@@ -627,4 +627,30 @@ summary(linear_regression_3C_B)
 
 ```
 
+
+```{r}
+
+# Computing additional mixed models for second revision. 
+library(nlme)
+
+# Pivoting the data to be in required format. 
+long_data <- port_preprocessed_data %>%
+  pivot_longer(
+    cols = starts_with("first_") | starts_with("last_treatment_"),  
+    names_to = c(".value", "treatment_type"),  
+    names_pattern = "(first|last_treatment)_(.*)" ) %>%
+  rename(baseline_score = first,  
+         final_score = last_treatment)
+
+# Implementing the mixed model
+mixed_model <- lme(final_score ~ baseline_score + 
+                   retrospectively_treatment_helpful + retrospectively_reported_improvement + 
+                   demographics_gender + demographics_age_at_screening, 
+                   random = ~ 1 | participant_id, 
+                   data = long_data)
+
+
+summary(mixed_model)
+
+```
 
