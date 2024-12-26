@@ -25,8 +25,10 @@ library(MASS) # to conduct the box-cox transformation of the delta phq9 variable
 library(car) # to ckeck assumption (5) of multicollinearity by computing the Variance Inflation Factor. 
 library(psych) # to compute the correlation matrix and further check the assumption (5) of multicollinearity. 
 library(ggplot2) # to visualise the linear regressions
-library(lme4) # for mixed models
-library(Matrix) # lme4 requires this package for the analyses conducted.
+# This is another package optionfor running the mixed models, but not compatible with all versions of R. 
+# library(lme4) # for mixed models
+# library(Matrix) # lme4 requires this package for the analyses conducted.
+library(nlme)
 ```
 
 ```{r}
@@ -629,28 +631,66 @@ summary(linear_regression_3C_B)
 
 
 ```{r}
+# Running the mixed models for each clinical questionnaire separately.
+# demographics_gender + demographics_age_at_screening + ieso_treatment_completed_total 
+# are standardised variables in all three models. 
 
-# Computing additional mixed models for second revision. 
-library(nlme)
-
-# Pivoting the data to be in required format. 
-long_data <- port_preprocessed_data %>%
-  pivot_longer(
-    cols = starts_with("first_") | starts_with("last_treatment_"),  
-    names_to = c(".value", "treatment_type"),  
-    names_pattern = "(first|last_treatment)_(.*)" ) %>%
-  rename(baseline_score = first,  
-         final_score = last_treatment)
-
-# Implementing the mixed model
-mixed_model <- lme(final_score ~ baseline_score + 
+# Implementing the mixed model for GAD-7.
+mixed_model_gad7 <- lme(last_treatment_gad7 ~ first_gad7 + 
                    retrospectively_treatment_helpful + retrospectively_reported_improvement + 
-                   demographics_gender + demographics_age_at_screening, 
+                   demographics_gender + demographics_age_at_screening + ieso_treatment_completed_total, 
                    random = ~ 1 | participant_id, 
-                   data = long_data)
+                   data = port_preprocessed_data)
 
+summary(mixed_model_gad7)
 
-summary(mixed_model)
+lm_model_gad7 <- lm(last_treatment_gad7 ~ first_gad7 + 
+                    retrospectively_treatment_helpful + retrospectively_reported_improvement + 
+                    demographics_gender + demographics_age_at_screening + ieso_treatment_completed_total, 
+                    data = port_preprocessed_data)
+
+anova(mixed_model_gad7, lm_model_gad7)
 
 ```
+
+```{r}
+
+# Implementing the mixed model for PHQ-9. 
+mixed_model_phq9 <- lme(last_treatment_phq9 ~ first_phq9 + 
+                   retrospectively_treatment_helpful + retrospectively_reported_improvement + 
+                   demographics_gender + demographics_age_at_screening + ieso_treatment_completed_total, 
+                   random = ~ 1 | participant_id, 
+                   data = port_preprocessed_data)
+
+summary(mixed_model_phq9)
+
+lm_model_phq9 <- lm(last_treatment_phq9 ~ first_phq9 + 
+                    retrospectively_treatment_helpful + retrospectively_reported_improvement + 
+                    demographics_gender + demographics_age_at_screening + ieso_treatment_completed_total, 
+                    data = port_preprocessed_data)
+
+anova(mixed_model_phq9, lm_model_phq9)
+
+```
+
+```{r}
+
+# Implementing the model for WSAS. 
+mixed_model_wsas <- lme(last_treatment_wsas ~ first_wsas + 
+                   retrospectively_treatment_helpful + retrospectively_reported_improvement + 
+                   demographics_gender + demographics_age_at_screening + ieso_treatment_completed_total, 
+                   random = ~ 1 | participant_id, 
+                   data = port_preprocessed_data)
+
+summary(mixed_model_wsas)
+
+lm_model_wsas <- lm(last_treatment_wsas ~ first_wsas + 
+                    retrospectively_treatment_helpful + retrospectively_reported_improvement + 
+                    demographics_gender + demographics_age_at_screening + ieso_treatment_completed_total, 
+                    data = port_preprocessed_data)
+
+anova(mixed_model_wsas, lm_model_wsas)
+
+```
+
 
