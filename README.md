@@ -1,4 +1,4 @@
-# Single-Item Patient-Rated Helpfulness and Improvement as an Alternative to Standardized Questionnaires for Establishing Anxiety and Depression Treatment Efficacy
+# Single-Item Ratings for Treatment Efficacy
 
 Brief description: 
 This research project was supervised by Thalia Eley and Thomas McGregor, as part of a King's Undergraduate Research Fellowship in 2023/2024. The code present in this repository was written in collaboration with Patrycja Sewerynek.
